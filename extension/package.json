@@ -20,6 +20,10 @@
         "title": "Mark lines as reviewed"
       },
       {
+        "command": "auditor.markAsModified",
+        "title": "Mark lines as modified"
+      },
+      {
         "command": "auditor.clearReviews",
         "title": "Mark lines as cleared"
       }

@@ -3,8 +3,20 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use service::{get_review_state, update_review_state, ReviewState, UpdateReviewState};
+use serde::{Deserialize, Serialize};
+use service::{get_review_state, update_review_state, UpdateReviewState};
 use std::net::SocketAddr;
+
+#[derive(Serialize)]
+pub struct ReviewState {
+    reviewed: Vec<usize>,
+    modified: Vec<usize>,
+}
+
+#[derive(Deserialize)]
+pub struct GetReviewRequest {
+    file_name: String,
+}
 
 #[tokio::main]
 async fn main() {
@@ -27,13 +39,31 @@ async fn root() -> &'static str {
     "Send GET & POST requests to /review"
 }
 
-async fn handle_get_review_state(Json(file_name): Json<String>) -> Json<ReviewState> {
-    let state = get_review_state(file_name);
-    Json(state)
+async fn handle_get_review_state(
+    Json(payload): Json<GetReviewRequest>,
+) -> (StatusCode, Json<ReviewState>) {
+    match get_review_state(payload.file_name) {
+        Ok(state) => (
+            StatusCode::CREATED,
+            Json(ReviewState {
+                reviewed: state.reviewed.into_iter().collect(),
+                modified: state.modified.into_iter().collect(),
+            }),
+        ),
+        Err(err) => {
+            println!("{}", err.reason);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ReviewState {
+                    modified: vec![],
+                    reviewed: vec![],
+                }),
+            )
+        }
+    }
 }
 
 async fn handle_update_review_state(Json(payload): Json<UpdateReviewState>) -> StatusCode {
-    println!("{:?}", payload);
     match update_review_state(payload) {
         Ok(_) => StatusCode::CREATED,
         Err(err) => {

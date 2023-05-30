@@ -69,14 +69,21 @@ function activate(context) {
   vscode.commands.registerTextEditorCommand(
     "auditor.markAsReviewed",
     (editor) => {
-      updateStateCallback(editor, "reviewed");
+      updateStateCallback(editor, "Reviewed");
+    }
+  );
+
+  vscode.commands.registerTextEditorCommand(
+    "auditor.markAsModified",
+    (editor) => {
+      updateStateCallback(editor, "Modified");
     }
   );
 
   vscode.commands.registerTextEditorCommand(
     "auditor.clearReviews",
     (editor) => {
-      updateStateCallback(editor, "cleared");
+      updateStateCallback(editor, "Cleared");
     }
   );
   vscode.window.onDidChangeActiveTextEditor(async (event) => {
