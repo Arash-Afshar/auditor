@@ -83,12 +83,14 @@ mod tests {
         let commit = "commit1".to_string();
         let file1 = "file1".to_string();
         let file2 = "file2".to_string();
-        let mut reviewed = HashSet::default();
-        let mut modified = HashSet::default();
         let mut file_reviews = HashMap::default();
-        reviewed.insert(0);
-        modified.insert(1);
-        file_reviews.insert(file1.clone(), StoredReviewForFile { reviewed, modified });
+        file_reviews.insert(
+            file1.clone(),
+            StoredReviewForFile {
+                reviewed: HashSet::from_iter(vec![0]),
+                modified: HashSet::from_iter(vec![1]),
+            },
+        );
         let state = &StoredReviewForCommit {
             files: file_reviews,
             exclusions: vec![],

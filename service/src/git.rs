@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use crate::{Diff, LineDiff, MyError};
 use git2::{Oid, Patch, Repository, Tree};
+use std::collections::HashMap;
 
 pub struct Git {
     repo: Repository,
