@@ -1,7 +1,7 @@
 {
   "name": "auditor",
   "displayName": "auditor",
-  "description": "",
+  "description": "Track and manage audits/reviews of large code changes",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.78.0"
@@ -10,14 +10,38 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "auditor.helloWorld",
-        "title": "Hello World"
+        "command": "auditor.markAsReviewed",
+        "title": "Mark lines as reviewed"
+      },
+      {
+        "command": "auditor.clearReviews",
+        "title": "Mark lines as cleared"
+      }
+    ],
+    "colors": [
+      {
+        "id": "auditor.reviewedBackground",
+        "description": "Background decoration color for reviewed lines",
+        "defaults": {
+          "dark": "#FFF00055",
+          "light": "#FFF00055",
+          "highContrast": "#FFF00055"
+        }
+      },
+      {
+        "id": "auditor.modifiedBackground",
+        "description": "Background decoration color for modified lines",
+        "defaults": {
+          "dark": "#FF000055",
+          "light": "#FF000055",
+          "highContrast": "#FF000055"
+        }
       }
     ]
   },

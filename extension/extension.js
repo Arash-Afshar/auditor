@@ -1,32 +1,100 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 const vscode = require("vscode");
-
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-  console.log('Congratulations, your extension "auditor" is now active!');
+  const prefix = "/home/aafshar/repos/vscode-extensions";
 
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with  registerCommand
-  // The commandId parameter must match the command field in package.json
-  let disposable = vscode.commands.registerCommand(
-    "auditor.helloWorld",
-    function () {
-      // The code you place here will be executed every time your command is executed
+  const reviewedLineDecorationType =
+    vscode.window.createTextEditorDecorationType({
+      backgroundColor: { id: "auditor.reviewedBackground" },
+    });
 
-      // Display a message box to the user
-      vscode.window.showInformationMessage("Hello World from auditor!");
+  const modifiedLineDecorationType =
+    vscode.window.createTextEditorDecorationType({
+      backgroundColor: { id: "auditor.modifiedBackground" },
+    });
+  const getReviewState = async (fileName) => {
+    console.log("Querying the state for ", fileName);
+    return {
+      reviewed: [0, 1],
+      modified: [2],
+    };
+  };
+
+  const updateReviewState = async (
+    fileName,
+    startLine,
+    endLine,
+    reviewState
+  ) => {
+    console.log("Update", fileName, startLine, endLine, reviewState);
+  };
+
+  const showReviewState = ({ reviewed, modified }) => {
+    let activeEditor = vscode.window.activeTextEditor;
+    reviewed = new Set(reviewed);
+    modified = new Set(modified);
+    if (activeEditor) {
+      const reviewedLines = [];
+      const modifiedLines = [];
+      for (let i = 0; i < activeEditor.document.lineCount; i++) {
+        const decoration = {
+          range: activeEditor.document.lineAt(i).range,
+          // hoverMessage: "Reviewed",
+          // hoverMessage: "Modified",
+        };
+        if (reviewed.has(i)) {
+          reviewedLines.push(decoration);
+        } else if (modified.has(i)) {
+          modifiedLines.push(decoration);
+        }
+      }
+
+      activeEditor.setDecorations(reviewedLineDecorationType, reviewedLines);
+      activeEditor.setDecorations(modifiedLineDecorationType, modifiedLines);
+    }
+  };
+  const updateStateCallback = (editor, state) => {
+    let start = editor.selection.start.line;
+    let end = editor.selection.end.line;
+    if (end < start) {
+      [start, end] = [end, start];
+    }
+    const fileName = editor.document.fileName.replace(prefix, "");
+    updateReviewState(fileName, start, end, state);
+  };
+
+  vscode.commands.registerTextEditorCommand(
+    "auditor.markAsReviewed",
+    (editor) => {
+      updateStateCallback(editor, "reviewed");
     }
   );
 
-  context.subscriptions.push(disposable);
+  vscode.commands.registerTextEditorCommand(
+    "auditor.clearReviews",
+    (editor) => {
+      updateStateCallback(editor, "cleared");
+    }
+  );
+  vscode.window.onDidChangeActiveTextEditor(async (event) => {
+    if (event != undefined) {
+      const fileName = event.document.fileName.replace(prefix, "");
+      const state = await getReviewState(fileName);
+      showReviewState(state);
+    }
+  });
+
+  // duplicate code: run the above on the first activation as well
+  let activeEditor = vscode.window.activeTextEditor;
+  if (activeEditor) {
+    const fileName = activeEditor.document.fileName.replace(prefix, "");
+    getReviewState(fileName).then((state) => {
+      showReviewState(state);
+    });
+  }
 }
 
 // This method is called when your extension is deactivated
