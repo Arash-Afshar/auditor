@@ -291,26 +291,26 @@ function activate(context) {
       updateStateCallback(editor, "Cleared");
     }
   );
-  // vscode.window.onDidChangeActiveTextEditor(async (event) => {
-  //   if (event != undefined) {
-  //     const fileName = event.document.fileName;
-  //     const state = await getReviewState(fileName);
-  //     showReviewState(state);
-  //   }
-  // });
+  vscode.window.onDidChangeActiveTextEditor(async (event) => {
+    if (event != undefined) {
+      const fileName = event.document.fileName;
+      const state = await getReviewState(fileName);
+      showReviewState(state);
+    }
+  });
 
-  // // duplicate code: run the above on the first activation as well
-  // let activeEditor = vscode.window.activeTextEditor;
-  // if (activeEditor) {
-  //   const fileName = activeEditor.document.fileName;
-  //   getReviewState(fileName).then((state) => {
-  //     showReviewState(state);
-  //   });
-  // }
+  // duplicate code: run the above on the first activation as well
+  let activeEditor = vscode.window.activeTextEditor;
+  if (activeEditor) {
+    const fileName = activeEditor.document.fileName;
+    getReviewState(fileName).then((state) => {
+      showReviewState(state);
+    });
+  }
 }
 
 // This method is called when your extension is deactivated
-function deactivate() {}
+function deactivate() { }
 
 module.exports = {
   activate,
