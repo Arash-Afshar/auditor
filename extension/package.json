@@ -27,8 +27,136 @@
       {
         "command": "auditor.clearReviews",
         "title": "Mark lines as cleared"
+      },
+      {
+        "command": "auditor.createNote",
+        "title": "Create Note",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "auditor.replyNote",
+        "title": "Reply",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "auditor.editNote",
+        "title": "Edit",
+        "icon": {
+          "dark": "resources/edit_inverse.svg",
+          "light": "resources/edit.svg"
+        }
+      },
+      {
+        "command": "auditor.deleteNote",
+        "title": "Delete",
+        "icon": {
+          "dark": "resources/close_inverse.svg",
+          "light": "resources/close.svg"
+        }
+      },
+      {
+        "command": "auditor.deleteNoteComment",
+        "title": "Delete",
+        "icon": {
+          "dark": "resources/close_inverse.svg",
+          "light": "resources/close.svg"
+        }
+      },
+      {
+        "command": "auditor.saveNote",
+        "title": "Save"
+      },
+      {
+        "command": "auditor.cancelsaveNote",
+        "title": "Cancel"
+      },
+      {
+        "command": "auditor.startDraft",
+        "title": "Start Draft",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "auditor.finishDraft",
+        "title": "Finish Draft"
+      },
+      {
+        "command": "auditor.dispose",
+        "title": "Remove All Notes"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "auditor.createNote",
+          "when": "false"
+        },
+        {
+          "command": "auditor.replyNote",
+          "when": "false"
+        },
+        {
+          "command": "auditor.deleteNote",
+          "when": "false"
+        },
+        {
+          "command": "auditor.deleteNoteComment",
+          "when": "false"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "auditor.deleteNote",
+          "group": "navigation",
+          "when": "commentController == comment-sample && !commentThreadIsEmpty"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "auditor.createNote",
+          "group": "inline",
+          "when": "commentController == comment-sample && commentThreadIsEmpty"
+        },
+        {
+          "command": "auditor.replyNote",
+          "group": "inline",
+          "when": "commentController == comment-sample && !commentThreadIsEmpty"
+        },
+        {
+          "command": "auditor.startDraft",
+          "group": "inline",
+          "when": "commentController == comment-sample && commentThreadIsEmpty"
+        },
+        {
+          "command": "auditor.finishDraft",
+          "group": "inline",
+          "when": "commentController == comment-sample && commentThread == draft"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "auditor.editNote",
+          "group": "group@1",
+          "when": "commentController == comment-sample"
+        },
+        {
+          "command": "auditor.deleteNoteComment",
+          "group": "group@2",
+          "when": "commentController == comment-sample && comment == canDelete"
+        }
+      ],
+      "comments/comment/context": [
+        {
+          "command": "auditor.cancelsaveNote",
+          "group": "inline@1",
+          "when": "commentController == comment-sample"
+        },
+        {
+          "command": "auditor.saveNote",
+          "group": "inline@2",
+          "when": "commentController == comment-sample"
+        }
+      ]
+    },
     "colors": [
       {
         "id": "auditor.reviewedBackground",
