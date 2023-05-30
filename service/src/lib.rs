@@ -78,10 +78,7 @@ pub fn get_review_state(
     let mut state = db.review_status_of_commit(&commit);
     let diff = git.diff_current_and_commit(commit, (state.exclusions).as_ref())?;
     if diff.is_some() {
-        dbg!(diff.clone());
-        dbg!(state.clone());
         state = transform_reviews(&state, diff);
-        dbg!(state.clone());
         db.store_review_status(&git.current_commit(), &state)?;
     }
     Ok(match state.files.get(file_name) {
@@ -135,7 +132,7 @@ fn transform_reviews(
             if line_diff.old.is_some() && line_diff.new.is_none() {
                 // TODO: for now going with a simplistic approach and ignoring the deleted lines.
                 // A good portion of these cases are "modifications" meaning that a line was deleted and another line was added in its place.
-                println!("The old line {} is deleted.", line_diff.old.unwrap());
+                // println!("The old line {} is deleted.", line_diff.old.unwrap());
             }
         }
     }

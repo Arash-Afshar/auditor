@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    fs::{self, File},
+    fs::File,
     io::{Read, Write},
-    time::{SystemTime, UNIX_EPOCH},
     vec,
 };
 
@@ -26,7 +25,8 @@ impl DB {
             Ok(mut input) => {
                 let mut contents = String::new();
                 input.read_to_string(&mut contents)?;
-                let deserialized: DB = serde_json::from_str(&contents)?;
+                let mut deserialized: DB = serde_json::from_str(&contents)?;
+                deserialized.path = path;
 
                 Ok(deserialized)
             }

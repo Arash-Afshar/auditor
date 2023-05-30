@@ -96,10 +96,9 @@ mod tests {
         let current = git.current_commit();
         let prev = "700610cb3aa6b28dde21e854ba4547e29b766a48".to_string();
         // assert_eq!(current, "c9085e7d80b737d25c3986fa55c8968d48ce8898");
-        let diff = git
+        let _diff = git
             .diff_current_and_commit(Some(prev), &vec!["service".to_string()])
             .unwrap();
-        dbg!(diff);
         assert!(git
             .diff_current_and_commit(None, &vec![])
             .unwrap()
