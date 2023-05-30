@@ -4,7 +4,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use service::{get_review_state, update_review_state, UpdateReviewState};
+use service::{db::DB, get_review_state, git::Git, update_review_state, UpdateReviewState};
 use std::net::SocketAddr;
 
 #[derive(Serialize)]
@@ -42,7 +42,10 @@ async fn root() -> &'static str {
 async fn handle_get_review_state(
     Json(payload): Json<GetReviewRequest>,
 ) -> (StatusCode, Json<ReviewState>) {
-    match get_review_state(payload.file_name) {
+    // TODO: find a way to share these across requests and handle the unwraps
+    let git = Git::new("../".to_string()).unwrap();
+    let mut db = DB::new("./db.json".to_string()).unwrap();
+    match get_review_state(payload.file_name, &mut db, &git) {
         Ok(state) => (
             StatusCode::CREATED,
             Json(ReviewState {
@@ -51,7 +54,7 @@ async fn handle_get_review_state(
             }),
         ),
         Err(err) => {
-            println!("{}", err.reason);
+            println!("{}", err.message);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ReviewState {
@@ -64,10 +67,13 @@ async fn handle_get_review_state(
 }
 
 async fn handle_update_review_state(Json(payload): Json<UpdateReviewState>) -> StatusCode {
-    match update_review_state(payload) {
+    // TODO: find a way to share these across requests and handle the unwraps
+    let mut db = DB::new("./db.json".to_string()).unwrap();
+    let git = Git::new("../".to_string()).unwrap();
+    match update_review_state(payload, &mut db, &git) {
         Ok(_) => StatusCode::CREATED,
         Err(err) => {
-            println!("{}", err.reason);
+            println!("{}", err.message);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
