@@ -1,5 +1,5 @@
 {
-  "name": "auditor",
+  "name": "auditor1",
   "displayName": "auditor",
   "description": "Track and manage audits/reviews of large code changes",
   "repository": "https://github.com/Arash-Afshar/auditor",
