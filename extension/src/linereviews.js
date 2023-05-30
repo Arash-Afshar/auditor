@@ -3,6 +3,7 @@ const vscode = require("vscode");
 const fetch = require("node-fetch");
 
 function linereviewHandler(endpoint) {
+    endpoint = endpoint + "reviews"
     const reviewedLineDecorationType =
         vscode.window.createTextEditorDecorationType({
             backgroundColor: { id: "auditor.reviewedBackground" },
@@ -18,7 +19,6 @@ function linereviewHandler(endpoint) {
             endpoint + "?" + new URLSearchParams({ file_name: fileName })
         );
         const review_state = await response.json();
-        console.log("querying", fileName, "result:", review_state);
         return review_state;
     };
 
@@ -106,8 +106,10 @@ function linereviewHandler(endpoint) {
     vscode.window.onDidChangeActiveTextEditor(async (event) => {
         if (event != undefined) {
             const fileName = event.document.fileName;
-            const state = await getReviewState(fileName);
-            showReviewState(state);
+            if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+                const state = await getReviewState(fileName);
+                showReviewState(state);
+            }
         }
     });
 
@@ -115,9 +117,11 @@ function linereviewHandler(endpoint) {
     let activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
         const fileName = activeEditor.document.fileName;
-        getReviewState(fileName).then((state) => {
-            showReviewState(state);
-        });
+        if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+            getReviewState(fileName).then((state) => {
+                showReviewState(state);
+            });
+        }
     }
 }
 

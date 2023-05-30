@@ -8,7 +8,7 @@ use std::{
 pub mod db;
 pub mod git;
 
-// TODO: rewrite with thiserror
+// TODO: rewrite with thiserror and anyhow
 #[derive(Debug)]
 pub struct MyError {
     pub message: String,
@@ -21,6 +21,16 @@ impl<E: Display> From<E> for MyError {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Comment {
+    pub id: String,
+    pub body: String,
+    pub author: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FileComments(pub HashMap<usize, Vec<Comment>>);
 
 #[derive(Deserialize, Debug)]
 pub enum State {

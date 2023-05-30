@@ -5,8 +5,9 @@ use std::{
     io::{Read, Write},
     vec,
 };
+use uuid::Uuid;
 
-use crate::{MyError, StoredReviewForCommit};
+use crate::{Comment, FileComments, MyError, StoredReviewForCommit};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DB {
@@ -17,6 +18,8 @@ pub struct DB {
     commit_reviews: HashMap<String, StoredReviewForCommit>,
     // Contains the list of excluded directories
     exclusions: Vec<String>,
+    // Maps filepath to comments
+    comments: HashMap<String, FileComments>,
 }
 
 impl DB {
@@ -35,6 +38,7 @@ impl DB {
                 latest_reviewed_commit_for_file: HashMap::default(),
                 commit_reviews: HashMap::default(),
                 exclusions: vec![],
+                comments: HashMap::default(),
             }),
         }
     }
@@ -79,6 +83,140 @@ impl DB {
         }
         self.commit_reviews.insert(commit.clone(), state.clone());
         Ok(())
+    }
+
+    pub fn add_new_comment(
+        &mut self,
+        file_name: String,
+        line_number: usize,
+        body: String,
+        author: String,
+    ) -> Result<String, MyError> {
+        let id = Uuid::new_v4().to_string();
+        let comment = Comment {
+            id: id.clone(),
+            body,
+            author,
+        };
+        // TODO: find an idiomatic way of doing this!
+        if !self.comments.contains_key(&file_name) {
+            self.comments
+                .insert(file_name.clone(), FileComments(HashMap::default()));
+        }
+        if !self
+            .comments
+            .get(&file_name)
+            .unwrap()
+            .0
+            .contains_key(&line_number)
+        {
+            self.comments
+                .get_mut(&file_name)
+                .unwrap()
+                .0
+                .insert(line_number, vec![]);
+        }
+        self.comments
+            .get_mut(&file_name)
+            .unwrap()
+            .0
+            .get_mut(&line_number)
+            .unwrap()
+            .push(comment);
+        Ok(id)
+    }
+
+    pub fn delete_comment(
+        &mut self,
+        file_name: String,
+        comment_id: String,
+        line_number: usize,
+    ) -> Result<(), MyError> {
+        let current_comments = self
+            .comments
+            .get(&file_name)
+            .unwrap()
+            .0
+            .get(&line_number)
+            .unwrap();
+
+        let mut index = 0;
+        for (i, comment) in current_comments.iter().enumerate() {
+            if comment.id == comment_id {
+                index = i;
+                break;
+            } else {
+                return Err(MyError {
+                    message: "comment id does not exist".to_string(),
+                });
+            }
+        }
+
+        let comment_list = self
+            .comments
+            .get_mut(&file_name)
+            .unwrap()
+            .0
+            .get_mut(&line_number)
+            .unwrap();
+        comment_list.remove(index);
+        if comment_list.is_empty() {
+            self.comments
+                .get_mut(&file_name)
+                .unwrap()
+                .0
+                .remove(&line_number);
+        }
+        Ok(())
+    }
+
+    pub fn update_comment(
+        &mut self,
+        file_name: String,
+        comment_id: String,
+        line_number: usize,
+        body: String,
+        author: String,
+    ) -> Result<(), MyError> {
+        let current_comments = self
+            .comments
+            .get(&file_name)
+            .unwrap()
+            .0
+            .get(&line_number)
+            .unwrap();
+
+        let mut index = 0;
+        for (i, comment) in current_comments.iter().enumerate() {
+            if comment.id == comment_id {
+                index = i;
+                break;
+            } else {
+                return Err(MyError {
+                    message: "comment id does not exist".to_string(),
+                });
+            }
+        }
+
+        let comment = self
+            .comments
+            .get_mut(&file_name)
+            .unwrap()
+            .0
+            .get_mut(&line_number)
+            .unwrap()
+            .get_mut(index)
+            .unwrap();
+
+        comment.body = body;
+        comment.author = author;
+
+        Ok(())
+    }
+
+    pub fn get_file_comments(&self, file_name: &String) -> Option<FileComments> {
+        print!("file_name: {}", file_name);
+        self.comments.get(file_name).cloned()
     }
 }
 

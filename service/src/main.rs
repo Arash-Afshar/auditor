@@ -1,11 +1,13 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::{delete, get, post, put},
     Json, Router,
 };
-use serde::Serialize;
-use service::{db::DB, get_review_state, git::Git, update_review_state, UpdateReviewState};
+use serde::{Deserialize, Serialize};
+use service::{
+    db::DB, get_review_state, git::Git, update_review_state, FileComments, UpdateReviewState,
+};
 use std::{collections::HashMap, env, net::SocketAddr};
 
 #[derive(Clone)]
@@ -18,6 +20,29 @@ pub struct AppState {
 pub struct ReviewState {
     reviewed: Vec<usize>,
     modified: Vec<usize>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CreateComment {
+    file_name: String,
+    line_number: usize,
+    body: String,
+    author: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateComment {
+    line_number: usize,
+    comment_id: String,
+    body: String,
+    author: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct DeleteComment {
+    file_name: String,
+    line_number: usize,
+    comment_id: String,
 }
 
 const REPO_PATH_ENV: &str = "REPO_PATH";
@@ -38,8 +63,12 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(root))
-        .route("/review", get(handle_get_review_state))
-        .route("/review", post(handle_update_review_state))
+        .route("/reviews", post(handle_update_review_state))
+        .route("/reviews", get(handle_get_review_state))
+        .route("/comments", post(handle_create_comment))
+        .route("/comments", get(handle_get_comments))
+        .route("/comments", delete(handle_delete_comment))
+        //.route("/comments/:comment_id", put(handle_update_comment))
         .with_state(app_state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -51,7 +80,7 @@ async fn main() {
 }
 
 async fn root() -> &'static str {
-    "Send GET & POST requests to /review"
+    "Send requests to /reviews and /comments endpoints"
 }
 
 async fn handle_get_review_state(
@@ -116,5 +145,82 @@ async fn handle_update_review_state(
             println!("{}", err.message);
             StatusCode::INTERNAL_SERVER_ERROR
         }
+    }
+}
+
+async fn handle_create_comment(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateComment>,
+) -> (StatusCode, Json<String>) {
+    println!("POST Request received: {:?}", payload);
+    let mut db = DB::new(state.db_path).unwrap();
+    let file_name = payload.file_name.replace(&state.repo_path, &"".to_string());
+    match db.add_new_comment(file_name, payload.line_number, payload.body, payload.author) {
+        Ok(new_comment_id) => {
+            db.save().unwrap();
+            (StatusCode::CREATED, Json(new_comment_id))
+        }
+        Err(err) => {
+            println!("{:?}", err);
+            (StatusCode::BAD_REQUEST, Json("".to_string()))
+        }
+    }
+}
+
+async fn handle_update_comment(
+    State(state): State<AppState>,
+    Path(file_name): Path<String>,
+    Json(payload): Json<UpdateComment>,
+) -> StatusCode {
+    let mut db = DB::new(state.db_path).unwrap();
+    match db.update_comment(
+        file_name,
+        payload.comment_id,
+        payload.line_number,
+        payload.body,
+        payload.author,
+    ) {
+        Ok(_) => StatusCode::CREATED,
+        Err(err) => {
+            println!("{}", err.message);
+            StatusCode::BAD_REQUEST
+        }
+    }
+}
+
+async fn handle_delete_comment(
+    State(state): State<AppState>,
+    Json(payload): Json<DeleteComment>,
+) -> StatusCode {
+    println!("DELETE Request received: {:?}", payload);
+    let mut db = DB::new(state.db_path).unwrap();
+    let file_name = payload.file_name.replace(&state.repo_path, &"".to_string());
+    match db.delete_comment(file_name, payload.comment_id, payload.line_number) {
+        Ok(_) => {
+            db.save().unwrap();
+            StatusCode::CREATED
+        }
+        Err(err) => {
+            println!("{}", err.message);
+            StatusCode::BAD_REQUEST
+        }
+    }
+}
+
+async fn handle_get_comments(
+    State(state): State<AppState>,
+    Query(query): Query<HashMap<String, String>>,
+) -> (StatusCode, Json<FileComments>) {
+    println!("GET Request received: {:?}", query);
+    let db = DB::new(state.db_path).unwrap();
+    let file_name = query.get(&"file_name".to_string()).unwrap();
+    let file_name = file_name.replace(&state.repo_path, &"".to_string());
+
+    match db.get_file_comments(&file_name) {
+        Some(comments) => (StatusCode::CREATED, Json(comments)),
+        None => (
+            StatusCode::BAD_REQUEST,
+            Json(FileComments(HashMap::default())),
+        ),
     }
 }
