@@ -13,7 +13,7 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./extension.js",
+  "main": "src/extension.js",
   "contributes": {
     "commands": [
       {
@@ -120,16 +120,6 @@
           "command": "auditor.replyNote",
           "group": "inline",
           "when": "commentController == audit.comment-controller && !commentThreadIsEmpty"
-        },
-        {
-          "command": "auditor.startDraft",
-          "group": "inline",
-          "when": "commentController == audit.comment-controller && commentThreadIsEmpty"
-        },
-        {
-          "command": "auditor.finishDraft",
-          "group": "inline",
-          "when": "commentController == audit.comment-controller && commentThread == draft"
         }
       ],
       "comments/comment/title": [
