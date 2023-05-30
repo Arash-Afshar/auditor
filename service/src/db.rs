@@ -40,14 +40,14 @@ impl DB {
     }
 
     pub fn save(&self) -> Result<(), MyError> {
-        let start = SystemTime::now();
-        let since_the_epoch = start
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards");
-        let backup_path = format!("{}-{}.db", self.path, since_the_epoch.as_millis());
-        if std::path::Path::new(&self.path).exists() {
-            fs::rename(&self.path, backup_path)?;
-        }
+        // let start = SystemTime::now();
+        // let since_the_epoch = start
+        //     .duration_since(UNIX_EPOCH)
+        //     .expect("Time went backwards");
+        // let backup_path = format!("{}-{}.db", self.path, since_the_epoch.as_millis());
+        // if std::path::Path::new(&self.path).exists() {
+        //     fs::rename(&self.path, backup_path)?;
+        // }
         let ser = serde_json::to_string(&self)?;
         let mut output = File::create(&self.path)?;
         output.write_all(ser.as_bytes())?;

@@ -58,13 +58,13 @@ impl StoredReviewForCommit {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LineDiff {
     old: Option<u32>,
     new: Option<u32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Diff {
     files: HashMap<String, Vec<LineDiff>>,
 }
@@ -77,10 +77,13 @@ pub fn get_review_state(
     let commit = db.latest_reviewed_commit(&file_name);
     let mut state = db.review_status_of_commit(&commit);
     let diff = git.diff_current_and_commit(commit, (state.exclusions).as_ref())?;
-    if !diff.is_none() {
+    if diff.is_some() {
+        dbg!(diff.clone());
+        dbg!(state.clone());
         state = transform_reviews(&state, diff);
+        dbg!(state.clone());
+        db.store_review_status(&git.current_commit(), &state)?;
     }
-    db.store_review_status(&git.current_commit(), &state)?;
     Ok(match state.files.get(file_name) {
         Some(state) => state.clone(),
         None => StoredReviewForFile {
@@ -124,7 +127,8 @@ fn transform_reviews(
         let file_review = new_state.files.get_mut(&file_name).unwrap();
         for line_diff in line_diffs {
             if line_diff.new.is_some() {
-                let new_line_number = line_diff.new.unwrap().try_into().unwrap();
+                let new_line_number: usize = line_diff.new.unwrap().try_into().unwrap();
+                let new_line_number = new_line_number - 1;
                 file_review.reviewed.remove(&new_line_number);
                 file_review.modified.insert(new_line_number);
             }
