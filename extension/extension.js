@@ -4,7 +4,7 @@ const fetch = require("node-fetch");
 /**
  * @param {vscode.ExtensionContext} context
  */
-function activate(context) {
+function activate() {
   const endpoint = "http://localhost:3000/review"
 
   const reviewedLineDecorationType =

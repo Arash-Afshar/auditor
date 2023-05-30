@@ -7,7 +7,7 @@ pub struct Git {
 }
 
 impl Git {
-    pub fn new(path: String) -> Result<Self, MyError> {
+    pub fn new(path: &String) -> Result<Self, MyError> {
         let repo = Repository::open(path)?;
         Ok(Git { repo })
     }
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn test_diff() {
-        let git = Git::new("..".to_string()).unwrap();
+        let git = Git::new(&"..".to_string()).unwrap();
         let current = git.current_commit();
         let prev = "700610cb3aa6b28dde21e854ba4547e29b766a48".to_string();
         // assert_eq!(current, "c9085e7d80b737d25c3986fa55c8968d48ce8898");

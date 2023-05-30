@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    fs::File,
+    fs::{self, File},
     io::{Read, Write},
+    time::{SystemTime, UNIX_EPOCH},
     vec,
 };
 
@@ -10,6 +11,7 @@ use crate::{MyError, StoredReviewForCommit};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DB {
+    path: String,
     // Maps filepath to commit
     latest_reviewed_commit_for_file: HashMap<String, String>,
     // Maps commit to reviews
@@ -20,7 +22,7 @@ pub struct DB {
 
 impl DB {
     pub fn new(path: String) -> Result<Self, MyError> {
-        match File::open(path) {
+        match File::open(&path) {
             Ok(mut input) => {
                 let mut contents = String::new();
                 input.read_to_string(&mut contents)?;
@@ -29,6 +31,7 @@ impl DB {
                 Ok(deserialized)
             }
             Err(_) => Ok(Self {
+                path,
                 latest_reviewed_commit_for_file: HashMap::default(),
                 commit_reviews: HashMap::default(),
                 exclusions: vec![],
@@ -36,9 +39,17 @@ impl DB {
         }
     }
 
-    pub fn save(&self, dst: String) -> Result<(), MyError> {
+    pub fn save(&self) -> Result<(), MyError> {
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+        let backup_path = format!("{}-{}.db", self.path, since_the_epoch.as_millis());
+        if std::path::Path::new(&self.path).exists() {
+            fs::rename(&self.path, backup_path)?;
+        }
         let ser = serde_json::to_string(&self)?;
-        let mut output = File::create(dst)?;
+        let mut output = File::create(&self.path)?;
         output.write_all(ser.as_bytes())?;
         Ok(())
     }
@@ -98,7 +109,7 @@ mod tests {
 
         let mut db = DB::new(path.clone()).unwrap();
         db.store_review_status(&commit, state).unwrap();
-        db.save(path.clone()).unwrap();
+        db.save().unwrap();
         let db = DB::new(path.clone()).unwrap();
 
         assert_eq!(db.latest_reviewed_commit(&file1), Some(commit.clone()));

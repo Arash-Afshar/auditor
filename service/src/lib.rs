@@ -31,7 +31,7 @@ pub enum State {
 
 #[derive(Deserialize, Debug)]
 pub struct UpdateReviewState {
-    file_name: String,
+    pub file_name: String,
     start_line: usize,
     end_line: usize,
     review_state: State,
