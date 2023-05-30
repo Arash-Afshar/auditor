@@ -107,53 +107,53 @@
         {
           "command": "auditor.deleteNote",
           "group": "navigation",
-          "when": "commentController == comment-sample && !commentThreadIsEmpty"
+          "when": "commentController == audit.comment-controller && !commentThreadIsEmpty"
         }
       ],
       "comments/commentThread/context": [
         {
           "command": "auditor.createNote",
           "group": "inline",
-          "when": "commentController == comment-sample && commentThreadIsEmpty"
+          "when": "commentController == audit.comment-controller && commentThreadIsEmpty"
         },
         {
           "command": "auditor.replyNote",
           "group": "inline",
-          "when": "commentController == comment-sample && !commentThreadIsEmpty"
+          "when": "commentController == audit.comment-controller && !commentThreadIsEmpty"
         },
         {
           "command": "auditor.startDraft",
           "group": "inline",
-          "when": "commentController == comment-sample && commentThreadIsEmpty"
+          "when": "commentController == audit.comment-controller && commentThreadIsEmpty"
         },
         {
           "command": "auditor.finishDraft",
           "group": "inline",
-          "when": "commentController == comment-sample && commentThread == draft"
+          "when": "commentController == audit.comment-controller && commentThread == draft"
         }
       ],
       "comments/comment/title": [
         {
           "command": "auditor.editNote",
           "group": "group@1",
-          "when": "commentController == comment-sample"
+          "when": "commentController == audit.comment-controller"
         },
         {
           "command": "auditor.deleteNoteComment",
           "group": "group@2",
-          "when": "commentController == comment-sample && comment == canDelete"
+          "when": "commentController == audit.comment-controller && comment == canDelete"
         }
       ],
       "comments/comment/context": [
         {
           "command": "auditor.cancelsaveNote",
           "group": "inline@1",
-          "when": "commentController == comment-sample"
+          "when": "commentController == audit.comment-controller"
         },
         {
           "command": "auditor.saveNote",
           "group": "inline@2",
-          "when": "commentController == comment-sample"
+          "when": "commentController == audit.comment-controller"
         }
       ]
     },

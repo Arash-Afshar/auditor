@@ -8,15 +8,9 @@ class NoteComment {
   label; //: string | undefined;
   savedBody; //: string | vscode.MarkdownString; // for the Cancel button
 
-  constructor(
-    body,
-    mode,
-    author,
-    parent,
-    contextValue,
-  ) {
+  constructor(body, mode, author, parent, contextValue) {
     this.id = ++commentId;
-    this.savedBody = this.body;
+    this.savedBody = body;
   }
 }
 
@@ -24,11 +18,14 @@ class NoteComment {
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-  // Backend enpoint
-  const endpoint = "http://localhost:3000/review"
+  // Backend endpoint
+  const endpoint = "http://localhost:3000/review";
 
   // -------------------------- Comment handling
-  const commentController = vscode.comments.createCommentController('audit-comment', 'Comments/notes during code audits.');
+  const commentController = vscode.comments.createCommentController(
+    "audit.comment-controller",
+    "Comments/notes during code audits."
+  );
   context.subscriptions.push(commentController);
 
   // A `CommentingRangeProvider` controls where gutter decorations that allow adding comments are shown
@@ -36,113 +33,159 @@ function activate(context) {
     provideCommentingRanges: (document, token) => {
       const lineCount = document.lineCount;
       return [new vscode.Range(0, 0, lineCount - 1, 0)];
-    }
+    },
   };
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.createNote', (reply) => {
-    replyNote(reply);
-  }));
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.createNote", (reply) => {
+      console.log("----> createNote");
+      replyNote(reply);
+    })
+  );
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.replyNote', (reply) => {
-    replyNote(reply);
-  }));
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.replyNote", (reply) => {
+      console.log("----> replyNote");
+      replyNote(reply);
+    })
+  );
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.startDraft', (reply) => {
-    const thread = reply.thread;
-    thread.contextValue = 'draft';
-    const newComment = new NoteComment(reply.text, vscode.CommentMode.Preview, { name: 'vscode' }, thread);
-    newComment.label = 'pending';
-    thread.comments = [...thread.comments, newComment];
-  }));
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.startDraft", (reply) => {
+      console.log("----> startDraft");
+      const thread = reply.thread;
+      thread.contextValue = "draft";
+      const newComment = new NoteComment(
+        reply.text,
+        vscode.CommentMode.Preview,
+        { name: "vscode" },
+        thread
+      );
+      newComment.label = "pending";
+      thread.comments = [...thread.comments, newComment];
+    })
+  );
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.finishDraft', (reply) => {
-    const thread = reply.thread;
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.finishDraft", (reply) => {
+      console.log("----> finishDraft");
+      const thread = reply.thread;
 
-    if (!thread) {
-      return;
-    }
+      if (!thread) {
+        return;
+      }
 
-    thread.contextValue = undefined;
-    thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
-    if (reply.text) {
-      const newComment = new NoteComment(reply.text, vscode.CommentMode.Preview, { name: 'vscode' }, thread);
-      thread.comments = [...thread.comments, newComment].map(comment => {
-        comment.label = undefined;
-        return comment;
-      });
-    }
-  }));
+      thread.contextValue = undefined;
+      thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
+      if (reply.text) {
+        const newComment = new NoteComment(
+          reply.text,
+          vscode.CommentMode.Preview,
+          { name: "vscode" },
+          thread
+        );
+        thread.comments = [...thread.comments, newComment].map((comment) => {
+          comment.label = undefined;
+          return comment;
+        });
+      }
+    })
+  );
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.deleteNoteComment', (comment) => {
-    const thread = comment.parent;
-    if (!thread) {
-      return;
-    }
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.deleteNoteComment", (comment) => {
+      console.log("----> deleteNoteComment");
+      const thread = comment.parent;
+      if (!thread) {
+        return;
+      }
 
-    thread.comments = thread.comments.filter(cmt => cmt.id !== comment.id);
+      thread.comments = thread.comments.filter((cmt) => cmt.id !== comment.id);
 
-    if (thread.comments.length === 0) {
+      if (thread.comments.length === 0) {
+        thread.dispose();
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.deleteNote", (thread) => {
+      console.log("----> deleteComment");
       thread.dispose();
-    }
-  }));
+    })
+  );
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.deleteNote', (thread) => {
-    thread.dispose();
-  }));
-
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.cancelsaveNote', (comment) => {
-    if (!comment.parent) {
-      return;
-    }
-
-    comment.parent.comments = comment.parent.comments.map(cmt => {
-      if (cmt.id === comment.id) {
-        cmt.body = cmt.savedBody;
-        cmt.mode = vscode.CommentMode.Preview;
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.cancelsaveNote", (comment) => {
+      console.log("----> cancelsaveNote");
+      if (!comment.parent) {
+        return;
       }
 
-      return cmt;
-    });
-  }));
+      comment.parent.comments = comment.parent.comments.map((cmt) => {
+        if (cmt.id === comment.id) {
+          cmt.body = cmt.savedBody;
+          cmt.mode = vscode.CommentMode.Preview;
+        }
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.saveNote', (comment) => {
-    if (!comment.parent) {
-      return;
-    }
+        return cmt;
+      });
+    })
+  );
 
-    comment.parent.comments = comment.parent.comments.map(cmt => {
-      if (cmt.id === comment.id) {
-        cmt.savedBody = cmt.body;
-        cmt.mode = vscode.CommentMode.Preview;
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.saveNote", (comment) => {
+      console.log("----> saveNote");
+      if (!comment.parent) {
+        return;
       }
 
-      return cmt;
-    });
-  }));
+      comment.parent.comments = comment.parent.comments.map((cmt) => {
+        if (cmt.id === comment.id) {
+          cmt.savedBody = cmt.body;
+          cmt.mode = vscode.CommentMode.Preview;
+        }
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.editNote', (comment) => {
-    if (!comment.parent) {
-      return;
-    }
+        return cmt;
+      });
+    })
+  );
 
-    comment.parent.comments = comment.parent.comments.map(cmt => {
-      if (cmt.id === comment.id) {
-        cmt.mode = vscode.CommentMode.Editing;
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.editNote", (comment) => {
+      console.log("----> editNote");
+      if (!comment.parent) {
+        return;
       }
 
-      return cmt;
-    });
-  }));
+      comment.parent.comments = comment.parent.comments.map((cmt) => {
+        if (cmt.id === comment.id) {
+          cmt.mode = vscode.CommentMode.Editing;
+        }
 
-  context.subscriptions.push(vscode.commands.registerCommand('auditor.dispose', () => {
-    commentController.dispose();
-  }));
+        return cmt;
+      });
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("auditor.dispose", () => {
+      console.log("----> disposeNote");
+      commentController.dispose();
+    })
+  );
 
   function replyNote(reply) {
     const thread = reply.thread;
-    const newComment = new NoteComment(reply.text, vscode.CommentMode.Preview, { name: 'vscode' }, thread, thread.comments.length ? 'canDelete' : undefined);
-    if (thread.contextValue === 'draft') {
-      newComment.label = 'pending';
+    const newComment = new NoteComment(
+      reply.text,
+      vscode.CommentMode.Preview,
+      { name: "vscode" },
+      thread,
+      thread.comments.length ? "canDelete" : undefined
+    );
+    if (thread.contextValue === "draft") {
+      newComment.label = "pending";
     }
 
     thread.comments = [...thread.comments, newComment];
@@ -160,7 +203,9 @@ function activate(context) {
     });
 
   const getReviewState = async (fileName) => {
-    const response = await fetch(endpoint + "?" + new URLSearchParams({ file_name: fileName }));
+    const response = await fetch(
+      endpoint + "?" + new URLSearchParams({ file_name: fileName })
+    );
     const review_state = await response.json();
     return review_state;
   };
@@ -174,8 +219,8 @@ function activate(context) {
     try {
       await fetch(endpoint, {
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          Accept: "application/json",
+          "Content-Type": "application/json",
         },
         method: "POST",
         body: JSON.stringify({
@@ -183,12 +228,12 @@ function activate(context) {
           start_line: startLine,
           end_line: endLine,
           review_state: reviewState,
-        })
+        }),
       });
       const state = await getReviewState(fileName);
       showReviewState(state);
     } catch (error) {
-      console.error("error updating review state:", error)
+      console.error("error updating review state:", error);
     }
   };
 
@@ -246,26 +291,26 @@ function activate(context) {
       updateStateCallback(editor, "Cleared");
     }
   );
-  vscode.window.onDidChangeActiveTextEditor(async (event) => {
-    if (event != undefined) {
-      const fileName = event.document.fileName;
-      const state = await getReviewState(fileName);
-      showReviewState(state);
-    }
-  });
+  // vscode.window.onDidChangeActiveTextEditor(async (event) => {
+  //   if (event != undefined) {
+  //     const fileName = event.document.fileName;
+  //     const state = await getReviewState(fileName);
+  //     showReviewState(state);
+  //   }
+  // });
 
-  // duplicate code: run the above on the first activation as well
-  let activeEditor = vscode.window.activeTextEditor;
-  if (activeEditor) {
-    const fileName = activeEditor.document.fileName;
-    getReviewState(fileName).then((state) => {
-      showReviewState(state);
-    });
-  }
+  // // duplicate code: run the above on the first activation as well
+  // let activeEditor = vscode.window.activeTextEditor;
+  // if (activeEditor) {
+  //   const fileName = activeEditor.document.fileName;
+  //   getReviewState(fileName).then((state) => {
+  //     showReviewState(state);
+  //   });
+  // }
 }
 
 // This method is called when your extension is deactivated
-function deactivate() { }
+function deactivate() {}
 
 module.exports = {
   activate,
