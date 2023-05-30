@@ -1,10 +1,11 @@
 const vscode = require("vscode");
+const fetch = require("node-fetch");
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-  const prefix = "/home/aafshar/repos/vscode-extensions";
+  const endpoint = "http://localhost:3000/review"
 
   const reviewedLineDecorationType =
     vscode.window.createTextEditorDecorationType({
@@ -15,12 +16,11 @@ function activate(context) {
     vscode.window.createTextEditorDecorationType({
       backgroundColor: { id: "auditor.modifiedBackground" },
     });
+
   const getReviewState = async (fileName) => {
-    console.log("Querying the state for ", fileName);
-    return {
-      reviewed: [0, 1],
-      modified: [2],
-    };
+    const response = await fetch(endpoint + "?" + new URLSearchParams({ file_name: fileName }));
+    const review_state = await response.json();
+    return review_state;
   };
 
   const updateReviewState = async (
@@ -29,7 +29,25 @@ function activate(context) {
     endLine,
     reviewState
   ) => {
-    console.log("Update", fileName, startLine, endLine, reviewState);
+    try {
+      await fetch(endpoint, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        method: "POST",
+        body: JSON.stringify({
+          file_name: fileName,
+          start_line: startLine,
+          end_line: endLine,
+          review_state: reviewState,
+        })
+      });
+      const state = await getReviewState(fileName);
+      showReviewState(state);
+    } catch (error) {
+      console.error("error updating review state:", error)
+    }
   };
 
   const showReviewState = ({ reviewed, modified }) => {
@@ -62,7 +80,7 @@ function activate(context) {
     if (end < start) {
       [start, end] = [end, start];
     }
-    const fileName = editor.document.fileName.replace(prefix, "");
+    const fileName = editor.document.fileName;
     updateReviewState(fileName, start, end, state);
   };
 
@@ -88,7 +106,7 @@ function activate(context) {
   );
   vscode.window.onDidChangeActiveTextEditor(async (event) => {
     if (event != undefined) {
-      const fileName = event.document.fileName.replace(prefix, "");
+      const fileName = event.document.fileName;
       const state = await getReviewState(fileName);
       showReviewState(state);
     }
@@ -97,7 +115,7 @@ function activate(context) {
   // duplicate code: run the above on the first activation as well
   let activeEditor = vscode.window.activeTextEditor;
   if (activeEditor) {
-    const fileName = activeEditor.document.fileName.replace(prefix, "");
+    const fileName = activeEditor.document.fileName;
     getReviewState(fileName).then((state) => {
       showReviewState(state);
     });

@@ -8,7 +8,7 @@ use std::{
 
 use crate::{MyError, StoredReviewForCommit};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DB {
     // Maps filepath to commit
     latest_reviewed_commit_for_file: HashMap<String, String>,
@@ -111,5 +111,13 @@ mod tests {
             state.files.get(&file1).unwrap(),
             retrieved_state.files.get(&file1).unwrap()
         );
+    }
+
+    #[test]
+    fn test_inspect_db() {
+        // TODO: make this into a cmd
+        let path = "main.db".to_string();
+        let db = DB::new(path.clone()).unwrap();
+        println!("{:?}", db);
     }
 }

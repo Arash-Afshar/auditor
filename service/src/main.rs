@@ -1,21 +1,17 @@
 use axum::{
+    extract::Query,
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use service::{db::DB, get_review_state, git::Git, update_review_state, UpdateReviewState};
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 #[derive(Serialize)]
 pub struct ReviewState {
     reviewed: Vec<usize>,
     modified: Vec<usize>,
-}
-
-#[derive(Deserialize)]
-pub struct GetReviewRequest {
-    file_name: String,
 }
 
 #[tokio::main]
@@ -40,19 +36,34 @@ async fn root() -> &'static str {
 }
 
 async fn handle_get_review_state(
-    Json(payload): Json<GetReviewRequest>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> (StatusCode, Json<ReviewState>) {
     // TODO: find a way to share these across requests and handle the unwraps
+    println!("GET Request received: {:?}", query);
     let git = Git::new("../".to_string()).unwrap();
-    let mut db = DB::new("./db.json".to_string()).unwrap();
-    match get_review_state(payload.file_name, &mut db, &git) {
-        Ok(state) => (
-            StatusCode::CREATED,
+    let mut db = DB::new("main.db".to_string()).unwrap();
+    let file_name = query.get(&"file_name".to_string());
+    if file_name.is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
             Json(ReviewState {
-                reviewed: state.reviewed.into_iter().collect(),
-                modified: state.modified.into_iter().collect(),
+                reviewed: vec![],
+                modified: vec![],
             }),
-        ),
+        );
+    }
+    let file_name = file_name.unwrap();
+    match get_review_state(file_name, &mut db, &git) {
+        Ok(state) => {
+            db.save("main.db".to_string()).unwrap();
+            (
+                StatusCode::CREATED,
+                Json(ReviewState {
+                    reviewed: state.reviewed.into_iter().collect(),
+                    modified: state.modified.into_iter().collect(),
+                }),
+            )
+        }
         Err(err) => {
             println!("{}", err.message);
             (
@@ -68,10 +79,14 @@ async fn handle_get_review_state(
 
 async fn handle_update_review_state(Json(payload): Json<UpdateReviewState>) -> StatusCode {
     // TODO: find a way to share these across requests and handle the unwraps
-    let mut db = DB::new("./db.json".to_string()).unwrap();
+    println!("POST Request received: {:?}", payload);
     let git = Git::new("../".to_string()).unwrap();
+    let mut db = DB::new("main.db".to_string()).unwrap();
     match update_review_state(payload, &mut db, &git) {
-        Ok(_) => StatusCode::CREATED,
+        Ok(_) => {
+            db.save("main.db".to_string()).unwrap();
+            StatusCode::CREATED
+        }
         Err(err) => {
             println!("{}", err.message);
             StatusCode::INTERNAL_SERVER_ERROR

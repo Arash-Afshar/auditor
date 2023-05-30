@@ -43,7 +43,7 @@ pub struct StoredReviewForFile {
     pub modified: HashSet<usize>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StoredReviewForCommit {
     files: HashMap<String, StoredReviewForFile>,
     exclusions: Vec<String>,
@@ -70,7 +70,7 @@ pub struct Diff {
 }
 
 pub fn get_review_state(
-    file_name: String,
+    file_name: &String,
     db: &mut DB,
     git: &Git,
 ) -> Result<StoredReviewForFile, MyError> {
@@ -81,7 +81,7 @@ pub fn get_review_state(
         state = transform_reviews(&state, diff);
     }
     db.store_review_status(&git.current_commit(), &state)?;
-    Ok(match state.files.get(&file_name) {
+    Ok(match state.files.get(file_name) {
         Some(state) => state.clone(),
         None => StoredReviewForFile {
             reviewed: HashSet::default(),
@@ -96,12 +96,6 @@ pub fn update_review_state(
     git: &Git,
 ) -> Result<(), MyError> {
     let commit = db.latest_reviewed_commit(&changes.file_name);
-    if (&commit).is_none() || commit.as_ref().unwrap() != &git.current_commit() {
-        return Err(MyError {
-            message: "Call GET first".to_string(),
-        });
-    }
-
     let state = db.review_status_of_commit(&commit);
     let new_state = update_reviews(&state, changes);
     db.store_review_status(&git.current_commit(), &new_state)?;
