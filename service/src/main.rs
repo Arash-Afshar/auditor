@@ -1,7 +1,7 @@
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::StatusCode,
-    routing::{delete, get, post, put},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -30,13 +30,13 @@ pub struct CreateComment {
     author: String,
 }
 
-#[derive(Deserialize)]
-pub struct UpdateComment {
-    line_number: usize,
-    comment_id: String,
-    body: String,
-    author: String,
-}
+// #[derive(Deserialize)]
+// pub struct UpdateComment {
+//     line_number: usize,
+//     comment_id: String,
+//     body: String,
+//     author: String,
+// }
 
 #[derive(Deserialize, Debug)]
 pub struct DeleteComment {
@@ -167,26 +167,26 @@ async fn handle_create_comment(
     }
 }
 
-async fn handle_update_comment(
-    State(state): State<AppState>,
-    Path(file_name): Path<String>,
-    Json(payload): Json<UpdateComment>,
-) -> StatusCode {
-    let mut db = DB::new(state.db_path).unwrap();
-    match db.update_comment(
-        file_name,
-        payload.comment_id,
-        payload.line_number,
-        payload.body,
-        payload.author,
-    ) {
-        Ok(_) => StatusCode::CREATED,
-        Err(err) => {
-            println!("{}", err.message);
-            StatusCode::BAD_REQUEST
-        }
-    }
-}
+// async fn handle_update_comment(
+//     State(state): State<AppState>,
+//     Path(file_name): Path<String>,
+//     Json(payload): Json<UpdateComment>,
+// ) -> StatusCode {
+//     let mut db = DB::new(state.db_path).unwrap();
+//     match db.update_comment(
+//         file_name,
+//         payload.comment_id,
+//         payload.line_number,
+//         payload.body,
+//         payload.author,
+//     ) {
+//         Ok(_) => StatusCode::CREATED,
+//         Err(err) => {
+//             println!("{}", err.message);
+//             StatusCode::BAD_REQUEST
+//         }
+//     }
+// }
 
 async fn handle_delete_comment(
     State(state): State<AppState>,

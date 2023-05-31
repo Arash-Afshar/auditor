@@ -1,46 +1,74 @@
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::hash::{Hash, Hasher};
 use std::{
-    collections::HashMap,
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
     fs::File,
     io::{Read, Write},
     vec,
 };
 use uuid::Uuid;
 
-use crate::{Comment, FileComments, MyError, StoredReviewForCommit};
+use crate::{Comment, FileComments, MyError, StoredReviewForCommit, StoredReviewForFile};
+
+#[derive(Serialize, Deserialize, Debug)]
+struct DBForFile {
+    file_name: String,
+    latest_reviewed_commit: String,
+    // Maps commit to reviews
+    commit_reviews: HashMap<String, StoredReviewForFile>,
+    comments: FileComments,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DB {
-    path: String,
-    // Maps filepath to commit
-    latest_reviewed_commit_for_file: HashMap<String, String>,
-    // Maps commit to reviews
-    commit_reviews: HashMap<String, StoredReviewForCommit>,
+    db_dir: String,
+    // Maps filepath to db data
+    file_dbs: HashMap<String, DBForFile>,
     // Contains the list of excluded directories
     exclusions: Vec<String>,
-    // Maps filepath to comments
-    comments: HashMap<String, FileComments>,
+}
+
+impl DBForFile {
+    pub fn default(file_name: String) -> Self {
+        Self {
+            file_name,
+            latest_reviewed_commit: "".to_string(),
+            commit_reviews: HashMap::default(),
+            comments: FileComments(HashMap::default()),
+        }
+    }
 }
 
 impl DB {
-    pub fn new(path: String) -> Result<Self, MyError> {
-        match File::open(&path) {
-            Ok(mut input) => {
-                let mut contents = String::new();
-                input.read_to_string(&mut contents)?;
-                let mut deserialized: DB = serde_json::from_str(&contents)?;
-                deserialized.path = path;
+    pub fn new(db_dir: String) -> Result<Self, MyError> {
+        let paths = fs::read_dir(db_dir.clone()).unwrap();
+        let mut db = Self {
+            db_dir,
+            exclusions: vec![],
+            file_dbs: HashMap::default(),
+        };
 
-                Ok(deserialized)
+        for path in paths {
+            let path = path?;
+            if path
+                .file_name()
+                .as_os_str()
+                .to_str()
+                .unwrap()
+                .starts_with("db_")
+            {
+                let path = path.path();
+                let path = path.to_str().unwrap();
+                let mut file = File::open(path)?;
+                let mut contents = String::new();
+                file.read_to_string(&mut contents)?;
+                let deserialized: DBForFile = serde_json::from_str(&contents)?;
+                db.file_dbs
+                    .insert(deserialized.file_name.clone(), deserialized);
             }
-            Err(_) => Ok(Self {
-                path,
-                latest_reviewed_commit_for_file: HashMap::default(),
-                commit_reviews: HashMap::default(),
-                exclusions: vec![],
-                comments: HashMap::default(),
-            }),
         }
+        Ok(db)
     }
 
     pub fn save(&self) -> Result<(), MyError> {
@@ -52,24 +80,46 @@ impl DB {
         // if std::path::Path::new(&self.path).exists() {
         //     fs::rename(&self.path, backup_path)?;
         // }
-        let ser = serde_json::to_string(&self)?;
-        let mut output = File::create(&self.path)?;
-        output.write_all(ser.as_bytes())?;
+        for (file_name, db_content) in &self.file_dbs {
+            let ser = serde_json::to_string(&db_content)?;
+            let mut s = DefaultHasher::new();
+            file_name.hash(&mut s);
+            let id_from_path = s.finish().to_string();
+            let name: Vec<&str> = file_name.split("/").collect();
+            let base_name = name.last().unwrap();
+            let db_path = format!("{}/db_{}-{}.json", &self.db_dir, base_name, id_from_path);
+            let mut output = File::create(db_path)?;
+            output.write_all(ser.as_bytes())?;
+        }
         Ok(())
     }
 
     pub fn latest_reviewed_commit(&self, file_name: &String) -> Option<String> {
-        self.latest_reviewed_commit_for_file.get(file_name).cloned()
+        self.file_dbs
+            .get(file_name)
+            .and_then(|db| Some(db.latest_reviewed_commit.clone()))
     }
 
     pub fn review_status_of_commit(&self, commit: &Option<String>) -> StoredReviewForCommit {
-        match commit {
-            Some(commit) => match self.commit_reviews.get(commit) {
-                Some(review) => review.clone(),
-                None => StoredReviewForCommit::new(self.exclusions.clone()),
-            },
-            None => StoredReviewForCommit::new(self.exclusions.clone()),
+        let mut commit_reviews = StoredReviewForCommit {
+            exclusions: vec![],
+            files: HashMap::default(),
+        };
+        if commit.is_none() {
+            return StoredReviewForCommit::new(self.exclusions.clone());
         }
+        let commit = commit.clone().unwrap();
+        for (file_name, db_content) in &self.file_dbs {
+            let review = match db_content.commit_reviews.get(&commit) {
+                Some(review) => review.clone(),
+                None => StoredReviewForFile {
+                    modified: HashSet::default(),
+                    reviewed: HashSet::default(),
+                },
+            };
+            commit_reviews.files.insert(file_name.clone(), review);
+        }
+        commit_reviews
     }
 
     pub fn store_review_status(
@@ -77,11 +127,28 @@ impl DB {
         commit: &String,
         state: &StoredReviewForCommit,
     ) -> Result<(), MyError> {
-        for file in state.files.keys().into_iter() {
-            self.latest_reviewed_commit_for_file
-                .insert(file.clone(), commit.clone());
+        for file_name in state.files.keys().into_iter() {
+            let db_content = self
+                .file_dbs
+                .entry(file_name.clone())
+                .or_insert(DBForFile::default(file_name.clone()));
+            db_content.latest_reviewed_commit = commit.clone();
+            db_content.commit_reviews.insert(
+                commit.clone(),
+                state
+                    .files
+                    .get(file_name)
+                    .cloned()
+                    .or_else(|| {
+                        Some(StoredReviewForFile {
+                            reviewed: HashSet::default(),
+                            modified: HashSet::default(),
+                        })
+                    })
+                    .unwrap()
+                    .clone(),
+            );
         }
-        self.commit_reviews.insert(commit.clone(), state.clone());
         Ok(())
     }
 
@@ -98,31 +165,12 @@ impl DB {
             body,
             author,
         };
-        // TODO: find an idiomatic way of doing this!
-        if !self.comments.contains_key(&file_name) {
-            self.comments
-                .insert(file_name.clone(), FileComments(HashMap::default()));
-        }
-        if !self
-            .comments
-            .get(&file_name)
-            .unwrap()
-            .0
-            .contains_key(&line_number)
-        {
-            self.comments
-                .get_mut(&file_name)
-                .unwrap()
-                .0
-                .insert(line_number, vec![]);
-        }
-        self.comments
-            .get_mut(&file_name)
-            .unwrap()
-            .0
-            .get_mut(&line_number)
-            .unwrap()
-            .push(comment);
+        let db_content = self
+            .file_dbs
+            .entry(file_name.clone())
+            .or_insert(DBForFile::default(file_name.clone()));
+        let current_comments = db_content.comments.0.entry(line_number).or_insert(vec![]);
+        current_comments.push(comment);
         Ok(id)
     }
 
@@ -133,11 +181,12 @@ impl DB {
         line_number: usize,
     ) -> Result<(), MyError> {
         let current_comments = self
-            .comments
-            .get(&file_name)
+            .file_dbs
+            .get_mut(&file_name)
             .unwrap()
+            .comments
             .0
-            .get(&line_number)
+            .get_mut(&line_number)
             .unwrap();
 
         let mut index = 0;
@@ -152,18 +201,12 @@ impl DB {
             }
         }
 
-        let comment_list = self
-            .comments
-            .get_mut(&file_name)
-            .unwrap()
-            .0
-            .get_mut(&line_number)
-            .unwrap();
-        comment_list.remove(index);
-        if comment_list.is_empty() {
-            self.comments
+        current_comments.remove(index);
+        if current_comments.is_empty() {
+            self.file_dbs
                 .get_mut(&file_name)
                 .unwrap()
+                .comments
                 .0
                 .remove(&line_number);
         }
@@ -179,11 +222,12 @@ impl DB {
         author: String,
     ) -> Result<(), MyError> {
         let current_comments = self
-            .comments
-            .get(&file_name)
+            .file_dbs
+            .get_mut(&file_name)
             .unwrap()
+            .comments
             .0
-            .get(&line_number)
+            .get_mut(&line_number)
             .unwrap();
 
         let mut index = 0;
@@ -198,15 +242,7 @@ impl DB {
             }
         }
 
-        let comment = self
-            .comments
-            .get_mut(&file_name)
-            .unwrap()
-            .0
-            .get_mut(&line_number)
-            .unwrap()
-            .get_mut(index)
-            .unwrap();
+        let comment = current_comments.get_mut(index).unwrap();
 
         comment.body = body;
         comment.author = author;
@@ -215,8 +251,11 @@ impl DB {
     }
 
     pub fn get_file_comments(&self, file_name: &String) -> Option<FileComments> {
-        print!("file_name: {}", file_name);
-        self.comments.get(file_name).cloned()
+        if let Some(db_content) = self.file_dbs.get(file_name) {
+            Some(db_content.comments.clone())
+        } else {
+            None
+        }
     }
 }
 
