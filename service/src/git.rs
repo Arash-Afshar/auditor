@@ -18,7 +18,7 @@ impl Git {
     }
 
     pub fn get_tree_from_commit(&self, commit: &str) -> Result<Tree, MyError> {
-        let commit = Oid::from_str(&commit)?;
+        let commit = Oid::from_str(commit)?;
         let commit = self.repo.find_commit(commit)?;
         let tree = commit.tree()?;
         Ok(tree)
@@ -63,8 +63,7 @@ impl Git {
             }
             let diff_content = Patch::from_diff(&diff, delta_index)?;
             let mut line_diffs = vec![];
-            if diff_content.is_some() {
-                let diff_content = diff_content.unwrap();
+            if let Some(diff_content) = diff_content {
                 for hunk_index in 0..diff_content.num_hunks() {
                     let hunk_line_count = diff_content.num_lines_in_hunk(hunk_index)?;
                     for line_index in 0..hunk_line_count {

@@ -85,7 +85,7 @@ impl DB {
             let mut s = DefaultHasher::new();
             file_name.hash(&mut s);
             let id_from_path = s.finish().to_string();
-            let name: Vec<&str> = file_name.split("/").collect();
+            let name: Vec<&str> = file_name.split('/').collect();
             let base_name = name.last().unwrap();
             let db_path = format!("{}/db_{}-{}.json", &self.db_dir, base_name, id_from_path);
             let mut output = File::create(db_path)?;
@@ -97,7 +97,7 @@ impl DB {
     pub fn latest_reviewed_commit(&self, file_name: &String) -> Option<String> {
         self.file_dbs
             .get(file_name)
-            .and_then(|db| Some(db.latest_reviewed_commit.clone()))
+            .map(|db| db.latest_reviewed_commit.clone())
     }
 
     pub fn review_status_of_commit(&self, commit: &Option<String>) -> StoredReviewForCommit {
@@ -124,17 +124,17 @@ impl DB {
 
     pub fn store_review_status(
         &mut self,
-        commit: &String,
+        commit: &str,
         state: &StoredReviewForCommit,
     ) -> Result<(), MyError> {
-        for file_name in state.files.keys().into_iter() {
+        for file_name in state.files.keys() {
             let db_content = self
                 .file_dbs
                 .entry(file_name.clone())
                 .or_insert(DBForFile::default(file_name.clone()));
-            db_content.latest_reviewed_commit = commit.clone();
+            db_content.latest_reviewed_commit = commit.to_string();
             db_content.commit_reviews.insert(
-                commit.clone(),
+                commit.to_string(),
                 state
                     .files
                     .get(file_name)
@@ -168,7 +168,7 @@ impl DB {
         let db_content = self
             .file_dbs
             .entry(file_name.clone())
-            .or_insert(DBForFile::default(file_name.clone()));
+            .or_insert(DBForFile::default(file_name));
         let current_comments = db_content.comments.0.entry(line_number).or_insert(vec![]);
         current_comments.push(comment);
         Ok(id)
@@ -189,17 +189,19 @@ impl DB {
             .get_mut(&line_number)
             .unwrap();
 
-        let mut index = 0;
+        let mut index = None;
         for (i, comment) in current_comments.iter().enumerate() {
             if comment.id == comment_id {
-                index = i;
+                index = Some(i);
                 break;
-            } else {
-                return Err(MyError {
-                    message: "comment id does not exist".to_string(),
-                });
             }
         }
+        if index.is_none() {
+            return Err(MyError {
+                message: "comment id does not exist".to_string(),
+            });
+        }
+        let index = index.unwrap();
 
         current_comments.remove(index);
         if current_comments.is_empty() {
@@ -230,17 +232,19 @@ impl DB {
             .get_mut(&line_number)
             .unwrap();
 
-        let mut index = 0;
+        let mut index = None;
         for (i, comment) in current_comments.iter().enumerate() {
             if comment.id == comment_id {
-                index = i;
+                index = Some(i);
                 break;
-            } else {
-                return Err(MyError {
-                    message: "comment id does not exist".to_string(),
-                });
             }
         }
+        if index.is_none() {
+            return Err(MyError {
+                message: "comment id does not exist".to_string(),
+            });
+        }
+        let index = index.unwrap();
 
         let comment = current_comments.get_mut(index).unwrap();
 
@@ -251,11 +255,9 @@ impl DB {
     }
 
     pub fn get_file_comments(&self, file_name: &String) -> Option<FileComments> {
-        if let Some(db_content) = self.file_dbs.get(file_name) {
-            Some(db_content.comments.clone())
-        } else {
-            None
-        }
+        self.file_dbs
+            .get(file_name)
+            .map(|db_content| db_content.comments.clone())
     }
 }
 
@@ -287,7 +289,7 @@ mod tests {
         let mut db = DB::new(path.clone()).unwrap();
         db.store_review_status(&commit, state).unwrap();
         db.save().unwrap();
-        let db = DB::new(path.clone()).unwrap();
+        let db = DB::new(path).unwrap();
 
         assert_eq!(db.latest_reviewed_commit(&file1), Some(commit.clone()));
         assert_eq!(db.latest_reviewed_commit(&file2), None);
@@ -305,7 +307,7 @@ mod tests {
     fn test_inspect_db() {
         // TODO: make this into a cmd
         let path = "main.db".to_string();
-        let db = DB::new(path.clone()).unwrap();
+        let db = DB::new(path).unwrap();
         println!("{:?}", db);
     }
 }

@@ -100,9 +100,7 @@ async fn handle_get_review_state(
             }),
         );
     }
-    let file_name = file_name
-        .unwrap()
-        .replace(&state.repo_path, &"".to_string());
+    let file_name = file_name.unwrap().replace(&state.repo_path, "");
     match get_review_state(&file_name, &mut db, &git) {
         Ok(state) => {
             db.save().unwrap();
@@ -135,7 +133,7 @@ async fn handle_update_review_state(
     let git = Git::new(&state.repo_path).unwrap();
     let mut db = DB::new(state.db_path).unwrap();
     let mut payload = payload;
-    payload.file_name = payload.file_name.replace(&state.repo_path, &"".to_string());
+    payload.file_name = payload.file_name.replace(&state.repo_path, "");
     match update_review_state(payload, &mut db, &git) {
         Ok(_) => {
             db.save().unwrap();
@@ -154,7 +152,7 @@ async fn handle_create_comment(
 ) -> (StatusCode, Json<String>) {
     println!("POST Request received: {:?}", payload);
     let mut db = DB::new(state.db_path).unwrap();
-    let file_name = payload.file_name.replace(&state.repo_path, &"".to_string());
+    let file_name = payload.file_name.replace(&state.repo_path, "");
     match db.add_new_comment(file_name, payload.line_number, payload.body, payload.author) {
         Ok(new_comment_id) => {
             db.save().unwrap();
@@ -194,7 +192,7 @@ async fn handle_delete_comment(
 ) -> StatusCode {
     println!("DELETE Request received: {:?}", payload);
     let mut db = DB::new(state.db_path).unwrap();
-    let file_name = payload.file_name.replace(&state.repo_path, &"".to_string());
+    let file_name = payload.file_name.replace(&state.repo_path, "");
     match db.delete_comment(file_name, payload.comment_id, payload.line_number) {
         Ok(_) => {
             db.save().unwrap();
@@ -214,7 +212,7 @@ async fn handle_get_comments(
     println!("GET Request received: {:?}", query);
     let db = DB::new(state.db_path).unwrap();
     let file_name = query.get(&"file_name".to_string()).unwrap();
-    let file_name = file_name.replace(&state.repo_path, &"".to_string());
+    let file_name = file_name.replace(&state.repo_path, "");
 
     match db.get_file_comments(&file_name) {
         Some(comments) => (StatusCode::CREATED, Json(comments)),

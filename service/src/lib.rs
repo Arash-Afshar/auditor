@@ -84,7 +84,7 @@ pub fn get_review_state(
     db: &mut DB,
     git: &Git,
 ) -> Result<StoredReviewForFile, MyError> {
-    let commit = db.latest_reviewed_commit(&file_name);
+    let commit = db.latest_reviewed_commit(file_name);
     let mut state = db.review_status_of_commit(&commit);
     let diff = git.diff_current_and_commit(commit, (state.exclusions).as_ref())?;
     if diff.is_some() {
@@ -109,7 +109,7 @@ pub fn update_review_state(
     let state = db.review_status_of_commit(&commit);
     let new_state = update_reviews(&state, changes);
     db.store_review_status(&git.current_commit(), &new_state)?;
-    return Ok(());
+    Ok(())
 }
 
 fn transform_reviews(
