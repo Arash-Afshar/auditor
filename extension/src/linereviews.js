@@ -4,6 +4,11 @@ const fetch = require("node-fetch");
 
 function linereviewHandler(endpoint) {
     endpoint = endpoint + "reviews"
+    const ignoredLineDecorationType =
+        vscode.window.createTextEditorDecorationType({
+            backgroundColor: { id: "auditor.ignoredBackground" },
+        });
+
     const reviewedLineDecorationType =
         vscode.window.createTextEditorDecorationType({
             backgroundColor: { id: "auditor.reviewedBackground" },
@@ -49,28 +54,34 @@ function linereviewHandler(endpoint) {
         }
     };
 
-    const showReviewState = ({ reviewed, modified }) => {
+    const showReviewState = ({ reviewed, modified, ignored }) => {
         let activeEditor = vscode.window.activeTextEditor;
         reviewed = new Set(reviewed);
         modified = new Set(modified);
+        ignored = new Set(ignored);
         if (activeEditor) {
             const reviewedLines = [];
             const modifiedLines = [];
+            const ignoredLines = [];
             for (let i = 0; i < activeEditor.document.lineCount; i++) {
                 const decoration = {
                     range: activeEditor.document.lineAt(i).range,
                     // hoverMessage: "Reviewed",
                     // hoverMessage: "Modified",
+                    // hoverMessage: "Ignored",
                 };
                 if (reviewed.has(i)) {
                     reviewedLines.push(decoration);
                 } else if (modified.has(i)) {
                     modifiedLines.push(decoration);
+                } else if (ignored.has(i)) {
+                    ignoredLines.push(decoration);
                 }
             }
 
             activeEditor.setDecorations(reviewedLineDecorationType, reviewedLines);
             activeEditor.setDecorations(modifiedLineDecorationType, modifiedLines);
+            activeEditor.setDecorations(ignoredLineDecorationType, ignoredLines);
         }
     };
     const updateStateCallback = (editor, state) => {
@@ -103,6 +114,14 @@ function linereviewHandler(endpoint) {
             updateStateCallback(editor, "Cleared");
         }
     );
+
+    vscode.commands.registerTextEditorCommand(
+        "auditor.markAsIgnored",
+        (editor) => {
+            updateStateCallback(editor, "Ignored");
+        }
+    );
+
     vscode.window.onDidChangeActiveTextEditor(async (event) => {
         if (event != undefined) {
             const fileName = event.document.fileName;

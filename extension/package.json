@@ -29,6 +29,10 @@
         "title": "Mark lines as cleared"
       },
       {
+        "command": "auditor.markAsIgnored",
+        "title": "Mark lines as ignored"
+      },
+      {
         "command": "auditor.createNote",
         "title": "Create Note",
         "enablement": "!commentIsEmpty"
@@ -148,6 +152,15 @@
       ]
     },
     "colors": [
+      {
+        "id": "auditor.ignoredBackground",
+        "description": "Background decoration color for ignored lines. These are the lines that will not be reviewed.",
+        "defaults": {
+          "dark": "#D3D3D3F0",
+          "light": "#D3D3D3F0",
+          "highContrast": "#D3D3D3F0"
+        }
+      },
       {
         "id": "auditor.reviewedBackground",
         "description": "Background decoration color for reviewed lines",

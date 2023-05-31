@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap, HashSet},
+    collections::{hash_map::DefaultHasher, HashMap},
     fs::File,
     io::{Read, Write},
     vec,
@@ -112,10 +112,7 @@ impl DB {
         for (file_name, db_content) in &self.file_dbs {
             let review = match db_content.commit_reviews.get(&commit) {
                 Some(review) => review.clone(),
-                None => StoredReviewForFile {
-                    modified: HashSet::default(),
-                    reviewed: HashSet::default(),
-                },
+                None => StoredReviewForFile::default(),
             };
             commit_reviews.files.insert(file_name.clone(), review);
         }
@@ -139,12 +136,7 @@ impl DB {
                     .files
                     .get(file_name)
                     .cloned()
-                    .or_else(|| {
-                        Some(StoredReviewForFile {
-                            reviewed: HashSet::default(),
-                            modified: HashSet::default(),
-                        })
-                    })
+                    .or_else(|| Some(StoredReviewForFile::default()))
                     .unwrap()
                     .clone(),
             );
@@ -279,6 +271,7 @@ mod tests {
             StoredReviewForFile {
                 reviewed: HashSet::from_iter(vec![0]),
                 modified: HashSet::from_iter(vec![1]),
+                ignored: HashSet::from_iter(vec![]), // TODO: add tests for this case
             },
         );
         let state = &StoredReviewForCommit {

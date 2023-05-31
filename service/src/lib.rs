@@ -36,6 +36,7 @@ pub struct FileComments(pub HashMap<usize, Vec<Comment>>);
 pub enum State {
     Reviewed,
     Modified,
+    Ignored,
     Cleared,
 }
 
@@ -51,6 +52,7 @@ pub struct UpdateReviewState {
 pub struct StoredReviewForFile {
     pub reviewed: HashSet<usize>,
     pub modified: HashSet<usize>,
+    pub ignored: HashSet<usize>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -79,6 +81,16 @@ pub struct Diff {
     files: HashMap<String, Vec<LineDiff>>,
 }
 
+impl StoredReviewForFile {
+    fn default() -> Self {
+        Self {
+            reviewed: HashSet::default(),
+            modified: HashSet::default(),
+            ignored: HashSet::default(),
+        }
+    }
+}
+
 pub fn get_review_state(
     file_name: &String,
     db: &mut DB,
@@ -93,10 +105,7 @@ pub fn get_review_state(
     }
     Ok(match state.files.get(file_name) {
         Some(state) => state.clone(),
-        None => StoredReviewForFile {
-            reviewed: HashSet::default(),
-            modified: HashSet::default(),
-        },
+        None => StoredReviewForFile::default(),
     })
 }
 
@@ -123,13 +132,9 @@ fn transform_reviews(
     let mut new_state = current_state.clone();
     for (file_name, line_diffs) in diff.files {
         if !new_state.files.contains_key(&file_name) {
-            new_state.files.insert(
-                file_name.clone(),
-                StoredReviewForFile {
-                    reviewed: HashSet::default(),
-                    modified: HashSet::default(),
-                },
-            );
+            new_state
+                .files
+                .insert(file_name.clone(), StoredReviewForFile::default());
         }
         let file_review = new_state.files.get_mut(&file_name).unwrap();
         for line_diff in line_diffs {
@@ -163,20 +168,28 @@ fn update_reviews(
                     current_file_reviews.reviewed.extend(&changed_lines);
                     for line in changed_lines {
                         current_file_reviews.modified.remove(&line);
+                        current_file_reviews.ignored.remove(&line);
                     }
                 }
                 State::Modified => {
                     current_file_reviews.modified.extend(&changed_lines);
                     for line in changed_lines {
                         current_file_reviews.reviewed.remove(&line);
+                        current_file_reviews.ignored.remove(&line);
+                    }
+                }
+                State::Ignored => {
+                    current_file_reviews.ignored.extend(&changed_lines);
+                    for line in changed_lines {
+                        current_file_reviews.reviewed.remove(&line);
+                        current_file_reviews.modified.remove(&line);
                     }
                 }
                 State::Cleared => {
                     for line in &changed_lines {
                         current_file_reviews.reviewed.remove(line);
-                    }
-                    for line in changed_lines {
-                        current_file_reviews.modified.remove(&line);
+                        current_file_reviews.modified.remove(line);
+                        current_file_reviews.ignored.remove(line);
                     }
                 }
             };
@@ -186,14 +199,22 @@ fn update_reviews(
                 State::Reviewed => StoredReviewForFile {
                     reviewed: changed_lines,
                     modified: HashSet::default(),
+                    ignored: HashSet::default(),
                 },
                 State::Modified => StoredReviewForFile {
                     reviewed: HashSet::default(),
                     modified: changed_lines,
+                    ignored: HashSet::default(),
+                },
+                State::Ignored => StoredReviewForFile {
+                    reviewed: HashSet::default(),
+                    modified: HashSet::default(),
+                    ignored: changed_lines,
                 },
                 State::Cleared => StoredReviewForFile {
                     reviewed: HashSet::default(),
                     modified: HashSet::default(),
+                    ignored: HashSet::default(),
                 },
             };
             new_state
@@ -219,6 +240,7 @@ mod tests {
             StoredReviewForFile {
                 reviewed: HashSet::from_iter(vec![0]),
                 modified: HashSet::from_iter(vec![1]),
+                ignored: HashSet::from_iter(vec![]), // TODO: add tests for this case
             },
         );
         let current_state = &StoredReviewForCommit {
@@ -297,6 +319,7 @@ mod tests {
             StoredReviewForFile {
                 reviewed: HashSet::from_iter(vec![0]),
                 modified: HashSet::from_iter(vec![1]),
+                ignored: HashSet::from_iter(vec![]), // TODO: add tests for this case
             },
         );
         let current_state = &StoredReviewForCommit {

@@ -20,6 +20,7 @@ pub struct AppState {
 pub struct ReviewState {
     reviewed: Vec<usize>,
     modified: Vec<usize>,
+    ignored: Vec<usize>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -97,6 +98,7 @@ async fn handle_get_review_state(
             Json(ReviewState {
                 reviewed: vec![],
                 modified: vec![],
+                ignored: vec![],
             }),
         );
     }
@@ -109,6 +111,7 @@ async fn handle_get_review_state(
                 Json(ReviewState {
                     reviewed: state.reviewed.into_iter().collect(),
                     modified: state.modified.into_iter().collect(),
+                    ignored: state.ignored.into_iter().collect(),
                 }),
             )
         }
@@ -119,6 +122,7 @@ async fn handle_get_review_state(
                 Json(ReviewState {
                     modified: vec![],
                     reviewed: vec![],
+                    ignored: vec![],
                 }),
             )
         }
