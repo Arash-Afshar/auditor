@@ -6,7 +6,7 @@ const linereviewHandler = require("./linereviews");
  */
 function activate(context) {
   // Backend endpoint
-  const endpoint = "http://localhost:3000/";
+  const endpoint = new URL('http://localhost:3000');
 
   commentHandler(context, endpoint);
   linereviewHandler(endpoint);

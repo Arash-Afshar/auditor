@@ -13,7 +13,7 @@ const newNoteComment = (id, body, mode, author, parent, contextValue) => {
 }
 
 async function commentHandler(context, endpoint) {
-    endpoint = endpoint + "comments"
+    endpoint.pathname += 'comments';
     const commentController = vscode.comments.createCommentController(
         "audit.comment-controller",
         "Comments/notes during code audits."
