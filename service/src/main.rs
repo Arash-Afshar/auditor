@@ -6,17 +6,26 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use service::{
-    db::DB, get_review_state, git::Git, update_review_state, FileComments, UpdateReviewState,
+    db::DB, get_review_state, git::Git, transform_review_state, update_review_state, FileComments,
+    StoredReviewForFile, UpdateReviewState,
 };
 use std::{collections::HashMap, env, net::SocketAddr, time::Duration};
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::{info_span, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+const REPO_PATH_ENV: &str = "REPO_PATH";
+const DB_PATH_ENV: &str = "DB_PATH";
+
 #[derive(Clone)]
 pub struct AppState {
     repo_path: String,
     db_path: String,
+}
+
+#[derive(Deserialize)]
+pub struct Transform {
+    file_name: String,
 }
 
 #[derive(Serialize)]
@@ -49,8 +58,25 @@ pub struct DeleteComment {
     comment_id: String,
 }
 
-const REPO_PATH_ENV: &str = "REPO_PATH";
-const DB_PATH_ENV: &str = "DB_PATH";
+impl ReviewState {
+    fn default() -> Self {
+        Self {
+            ignored: vec![],
+            modified: vec![],
+            reviewed: vec![],
+        }
+    }
+}
+
+impl From<StoredReviewForFile> for ReviewState {
+    fn from(state: StoredReviewForFile) -> Self {
+        Self {
+            reviewed: state.reviewed.into_iter().collect(),
+            modified: state.modified.into_iter().collect(),
+            ignored: state.ignored.into_iter().collect(),
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -78,6 +104,7 @@ async fn main() {
         .route("/", get(root))
         .route("/reviews", post(handle_update_review_state))
         .route("/reviews", get(handle_get_review_state))
+        .route("/transform", post(handle_transform_review_state))
         .route("/comments", post(handle_create_comment))
         .route("/comments", get(handle_get_comments))
         .route("/comments", delete(handle_delete_comment))
@@ -110,48 +137,49 @@ async fn main() {
 }
 
 async fn root() -> &'static str {
-    "Send requests to /reviews and /comments endpoints"
+    "Send requests to /reviews, /transform, and /comments endpoints"
 }
 
 async fn handle_get_review_state(
-    Query(query): Query<HashMap<String, String>>,
     State(state): State<AppState>,
+    Query(query): Query<HashMap<String, String>>,
+) -> (StatusCode, Json<ReviewState>) {
+    let db = DB::new(state.db_path).unwrap();
+    let file_name = query.get(&"file_name".to_string());
+    if file_name.is_none() {
+        return (StatusCode::BAD_REQUEST, Json(ReviewState::default()));
+    }
+    let file_name = file_name.unwrap().replace(&state.repo_path, "");
+    let file_name = file_name.replace(&state.repo_path, "");
+    return match get_review_state(&file_name, &db) {
+        Ok(state) => (StatusCode::CREATED, Json(state.into())),
+        Err(err) => {
+            tracing::error!("{}", err.message);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ReviewState::default()),
+            )
+        }
+    };
+}
+
+async fn handle_transform_review_state(
+    State(state): State<AppState>,
+    Json(payload): Json<Transform>,
 ) -> (StatusCode, Json<ReviewState>) {
     let git = Git::new(&state.repo_path).unwrap();
     let mut db = DB::new(state.db_path).unwrap();
-    let file_name = query.get(&"file_name".to_string());
-    if file_name.is_none() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(ReviewState {
-                reviewed: vec![],
-                modified: vec![],
-                ignored: vec![],
-            }),
-        );
-    }
-    let file_name = file_name.unwrap().replace(&state.repo_path, "");
-    match get_review_state(&file_name, &mut db, &git) {
+    let file_name = payload.file_name;
+    match transform_review_state(&file_name, &mut db, &git) {
         Ok(state) => {
-            // db.save().unwrap();
-            (
-                StatusCode::CREATED,
-                Json(ReviewState {
-                    reviewed: state.reviewed.into_iter().collect(),
-                    modified: state.modified.into_iter().collect(),
-                    ignored: state.ignored.into_iter().collect(),
-                }),
-            )
+            db.save().unwrap();
+            (StatusCode::CREATED, Json(state.into()))
         }
         Err(err) => {
-            println!("{}", err.message);
+            tracing::error!("{}", err.message);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ReviewState {
-                    modified: vec![],
-                    reviewed: vec![],
-                    ignored: vec![],
-                }),
+                Json(ReviewState::default()),
             )
         }
     }
@@ -171,7 +199,7 @@ async fn handle_update_review_state(
             StatusCode::CREATED
         }
         Err(err) => {
-            println!("{}", err.message);
+            tracing::error!("{}", err.message);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
@@ -189,7 +217,7 @@ async fn handle_create_comment(
             (StatusCode::CREATED, Json(new_comment_id))
         }
         Err(err) => {
-            println!("{:?}", err);
+            tracing::error!("{}", err.message);
             (StatusCode::BAD_REQUEST, Json("".to_string()))
         }
     }
@@ -228,7 +256,7 @@ async fn handle_delete_comment(
             StatusCode::CREATED
         }
         Err(err) => {
-            println!("{}", err.message);
+            tracing::error!("{}", err.message);
             StatusCode::BAD_REQUEST
         }
     }

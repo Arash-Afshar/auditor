@@ -2,8 +2,10 @@
 const vscode = require("vscode");
 const fetch = require("node-fetch");
 
-function linereviewHandler(endpoint) {
-    endpoint.pathname += 'reviews';
+function linereviewHandler(baseEndpoint) {
+    const reviewEndpoint = baseEndpoint + 'reviews';
+    const transformReviewEndpoint = baseEndpoint + 'transform';
+
     const ignoredLineDecorationType =
         vscode.window.createTextEditorDecorationType({
             backgroundColor: { id: "auditor.ignoredBackground" },
@@ -21,7 +23,7 @@ function linereviewHandler(endpoint) {
 
     const getReviewState = async (fileName) => {
         const response = await fetch(
-            endpoint + "?" + new URLSearchParams({ file_name: fileName })
+            reviewEndpoint + "?" + new URLSearchParams({ file_name: fileName })
         );
         const review_state = await response.json();
         return review_state;
@@ -34,7 +36,7 @@ function linereviewHandler(endpoint) {
         reviewState
     ) => {
         try {
-            await fetch(endpoint, {
+            await fetch(reviewEndpoint, {
                 headers: {
                     Accept: "application/json",
                     "Content-Type": "application/json",
@@ -45,6 +47,25 @@ function linereviewHandler(endpoint) {
                     start_line: startLine,
                     end_line: endLine,
                     review_state: reviewState,
+                }),
+            });
+            const state = await getReviewState(fileName);
+            showReviewState(state);
+        } catch (error) {
+            console.error("error updating review state:", error);
+        }
+    };
+
+    const transformReviewState = async (fileName) => {
+        try {
+            await fetch(transformReviewEndpoint, {
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
+                method: "POST",
+                body: JSON.stringify({
+                    file_name: fileName,
                 }),
             });
             const state = await getReviewState(fileName);
@@ -93,6 +114,14 @@ function linereviewHandler(endpoint) {
         const fileName = editor.document.fileName;
         updateReviewState(fileName, start, end, state);
     };
+
+    vscode.commands.registerTextEditorCommand(
+        "auditor.transform",
+        (editor) => {
+            const fileName = editor.document.fileName;
+            transformReviewState(fileName);
+        }
+    );
 
     vscode.commands.registerTextEditorCommand(
         "auditor.markAsReviewed",

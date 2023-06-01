@@ -91,7 +91,16 @@ impl StoredReviewForFile {
     }
 }
 
-pub fn get_review_state(
+pub fn get_review_state(file_name: &String, db: &DB) -> Result<StoredReviewForFile, MyError> {
+    let commit = db.latest_reviewed_commit(file_name);
+    let state = db.review_status_of_commit(&commit);
+    Ok(match state.files.get(file_name) {
+        Some(state) => state.clone(),
+        None => StoredReviewForFile::default(),
+    })
+}
+
+pub fn transform_review_state(
     file_name: &String,
     db: &mut DB,
     git: &Git,
@@ -131,15 +140,13 @@ fn transform_reviews(
     let diff = diff.unwrap();
     let mut new_state = current_state.clone();
     for (file_name, line_diffs) in diff.files {
-        if !new_state.files.contains_key(&file_name) {
-            new_state
-                .files
-                .insert(file_name.clone(), StoredReviewForFile::default());
-        }
-        let file_review = new_state.files.get_mut(&file_name).unwrap();
+        let file_review = new_state
+            .files
+            .entry(file_name)
+            .or_insert(StoredReviewForFile::default());
         for line_diff in line_diffs {
-            if line_diff.new.is_some() {
-                let new_line_number: usize = line_diff.new.unwrap().try_into().unwrap();
+            if let Some(new_line) = line_diff.new {
+                let new_line_number: usize = new_line.try_into().unwrap();
                 let new_line_number = new_line_number - 1;
                 file_review.reviewed.remove(&new_line_number);
                 file_review.modified.insert(new_line_number);

@@ -17,6 +17,10 @@
   "contributes": {
     "commands": [
       {
+        "command": "auditor.transform",
+        "title": "Update reviews to latest commit"
+      },
+      {
         "command": "auditor.markAsReviewed",
         "title": "Mark lines as reviewed"
       },

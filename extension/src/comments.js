@@ -13,7 +13,7 @@ const newNoteComment = (id, body, mode, author, parent, contextValue) => {
 }
 
 async function commentHandler(context, endpoint) {
-    endpoint.pathname += 'comments';
+    endpoint += 'comments';
     const commentController = vscode.comments.createCommentController(
         "audit.comment-controller",
         "Comments/notes during code audits."
@@ -119,19 +119,19 @@ async function commentHandler(context, endpoint) {
         thread.comments = [...thread.comments, newComment];
     }
 
-    function editComment(comment) {
-        if (!comment.parent) {
-            return;
-        }
+    // function editComment(comment) {
+    //     if (!comment.parent) {
+    //         return;
+    //     }
 
-        comment.parent.comments = comment.parent.comments.map((cmt) => {
-            if (cmt.id === comment.id) {
-                cmt.mode = vscode.CommentMode.Editing;
-            }
+    //     comment.parent.comments = comment.parent.comments.map((cmt) => {
+    //         if (cmt.id === comment.id) {
+    //             cmt.mode = vscode.CommentMode.Editing;
+    //         }
 
-            return cmt;
-        });
-    }
+    //         return cmt;
+    //     });
+    // }
 
     function saveComment(comment) {
         if (!comment.parent) {

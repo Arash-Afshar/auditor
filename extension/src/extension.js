@@ -6,10 +6,10 @@ const linereviewHandler = require("./linereviews");
  */
 function activate(context) {
   // Backend endpoint
-  const endpoint = 'http://localhost:3000';
+  const endpoint = 'http://localhost:3000/';
 
-  commentHandler(context, new URL(endpoint));
-  linereviewHandler(new URL(endpoint));
+  commentHandler(context, endpoint);
+  linereviewHandler(endpoint);
 }
 
 // This method is called when your extension is deactivated
