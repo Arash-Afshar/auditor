@@ -3,7 +3,7 @@ const vscode = require("vscode");
 const fetch = require("node-fetch");
 
 function linereviewHandler(endpoint) {
-    endpoint = endpoint + "reviews"
+    endpoint.pathname += 'reviews';
     const ignoredLineDecorationType =
         vscode.window.createTextEditorDecorationType({
             backgroundColor: { id: "auditor.ignoredBackground" },
