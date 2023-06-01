@@ -1,11 +1,9 @@
 use axum::{
     extract::{Query, State},
     http::{Request, StatusCode},
-    response::Response,
     routing::{delete, get, post},
     Json, Router,
 };
-use hyper::Body;
 use serde::{Deserialize, Serialize};
 use service::{
     db::DB, get_review_state, git::Git, update_review_state, FileComments, UpdateReviewState,
