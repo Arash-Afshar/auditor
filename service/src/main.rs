@@ -105,7 +105,7 @@ async fn handle_get_review_state(
     let file_name = file_name.unwrap().replace(&state.repo_path, "");
     match get_review_state(&file_name, &mut db, &git) {
         Ok(state) => {
-            db.save().unwrap();
+            // db.save().unwrap();
             (
                 StatusCode::CREATED,
                 Json(ReviewState {
