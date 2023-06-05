@@ -33,7 +33,8 @@ function linereviewHandler(baseEndpoint) {
         fileName,
         startLine,
         endLine,
-        reviewState
+        reviewState,
+        totalLines,
     ) => {
         try {
             await fetch(reviewEndpoint, {
@@ -47,6 +48,7 @@ function linereviewHandler(baseEndpoint) {
                     start_line: startLine,
                     end_line: endLine,
                     review_state: reviewState,
+                    total_lines: totalLines,
                 }),
             });
             const state = await getReviewState(fileName);
@@ -137,7 +139,8 @@ function linereviewHandler(baseEndpoint) {
             [start, end] = [end, start];
         }
         const fileName = editor.document.fileName;
-        updateReviewState(fileName, start, end, state);
+        const totalLines = editor.document.lineCount;
+        updateReviewState(fileName, start, end, state, totalLines);
     };
 
     vscode.commands.registerTextEditorCommand(
