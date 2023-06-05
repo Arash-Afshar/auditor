@@ -77,9 +77,34 @@ function linereviewHandler(baseEndpoint) {
 
     const showReviewState = ({ reviewed, modified, ignored }) => {
         let activeEditor = vscode.window.activeTextEditor;
-        reviewed = new Set(reviewed);
-        modified = new Set(modified);
-        ignored = new Set(ignored);
+
+        let _reviewed = new Set();
+        let _modified = new Set();
+        let _ignored = new Set();
+
+        for (let i = 0; i < reviewed.length; i++) {
+            const [s, e] = reviewed[i];
+            for (let j = s; j <= e; j++) {
+                _reviewed.add(j);
+            }
+        }
+        for (let i = 0; i < modified.length; i++) {
+            const [s, e] = modified[i];
+            for (let j = s; j <= e; j++) {
+                _modified.add(j);
+            }
+        }
+        for (let i = 0; i < ignored.length; i++) {
+            const [s, e] = ignored[i];
+            for (let j = s; j <= e; j++) {
+                _ignored.add(j);
+            }
+        }
+
+        reviewed = _reviewed;
+        modified = _modified;
+        ignored = _ignored;
+
         if (activeEditor) {
             const reviewedLines = [];
             const modifiedLines = [];

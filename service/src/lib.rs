@@ -240,9 +240,11 @@ pub fn update_review_state(
     db: &mut DB,
     git: &Git,
 ) -> Result<(), MyError> {
+    print!("---------------{changes:?}");
     let commit = db.latest_reviewed_commit(&changes.file_name);
     let state = db.review_status_of_commit(&commit);
     let new_state = update_reviews(&state, changes);
+    print!("---------------{new_state:?}");
     db.store_review_status(&git.current_commit(), &new_state)?;
     Ok(())
 }
