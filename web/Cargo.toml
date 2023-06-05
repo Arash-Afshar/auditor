@@ -1,10 +1,10 @@
 [package]
-name = "tailwind-csr-trunk"
+name = "web"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-leptos = { version = "0.2", features = [
+leptos = { version = "0.3", features = [
   "serde",
   "csr",
 ] }
