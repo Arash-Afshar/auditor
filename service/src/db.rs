@@ -14,6 +14,7 @@ use crate::{Comment, FileComments, MyError, StoredReviewForCommit, StoredReviewF
 #[derive(Serialize, Deserialize, Debug)]
 struct DBForFile {
     file_name: String,
+    total_lines: usize,
     latest_reviewed_commit: String,
     // Maps commit to reviews
     commit_reviews: HashMap<String, StoredReviewForFile>,
@@ -33,6 +34,7 @@ impl DBForFile {
     pub fn default(file_name: String) -> Self {
         Self {
             file_name,
+            total_lines: 0,
             latest_reviewed_commit: "".to_string(),
             commit_reviews: HashMap::default(),
             comments: FileComments(HashMap::default()),
@@ -261,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_read_write_scenarios() {
-        let path = "test.db".to_string();
+        let path = ".".to_string();
         let commit = "commit1".to_string();
         let file1 = "file1".to_string();
         let file2 = "file2".to_string();
@@ -269,9 +271,10 @@ mod tests {
         file_reviews.insert(
             file1.clone(),
             StoredReviewForFile {
-                reviewed: HashSet::from_iter(vec![0]),
-                modified: HashSet::from_iter(vec![1]),
-                ignored: HashSet::from_iter(vec![]), // TODO: add tests for this case
+                reviewed: vec![RangeInclusive::new(0, 0)],
+                modified: vec![RangeInclusive::new(1, 1)],
+                ignored: vec![], // TODO: add tests for this case
+                total_lines: 0,  // TODO: add tests for this case
             },
         );
         let state = &StoredReviewForCommit {
@@ -298,9 +301,9 @@ mod tests {
 
     #[test]
     fn test_inspect_db() {
-        // TODO: make this into a cmd
-        let path = "main.db".to_string();
-        let db = DB::new(path).unwrap();
-        println!("{:?}", db);
+        // // TODO: make this into a cmd
+        // let path = "main.db".to_string();
+        // let db = DB::new(path).unwrap();
+        // println!("{:?}", db);
     }
 }
