@@ -1,3 +1,7 @@
+use auditor::{
+    db::DB, get_review_state, git::Git, transform_review_state, update_review_state, FileComments,
+    StoredReviewForFile, UpdateReviewState,
+};
 use axum::{
     extract::{Query, State},
     http::{Request, StatusCode},
@@ -5,10 +9,6 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use service::{
-    db::DB, get_review_state, git::Git, transform_review_state, update_review_state, FileComments,
-    StoredReviewForFile, UpdateReviewState,
-};
 use std::{collections::HashMap, env, net::SocketAddr, time::Duration};
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::{info_span, Span};
@@ -30,9 +30,9 @@ pub struct Transform {
 
 #[derive(Serialize)]
 pub struct ReviewState {
-    reviewed: Vec<usize>,
-    modified: Vec<usize>,
-    ignored: Vec<usize>,
+    reviewed: Vec<(usize, usize)>,
+    modified: Vec<(usize, usize)>,
+    ignored: Vec<(usize, usize)>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -71,9 +71,21 @@ impl ReviewState {
 impl From<StoredReviewForFile> for ReviewState {
     fn from(state: StoredReviewForFile) -> Self {
         Self {
-            reviewed: state.reviewed.into_iter().collect(),
-            modified: state.modified.into_iter().collect(),
-            ignored: state.ignored.into_iter().collect(),
+            reviewed: state
+                .reviewed
+                .iter()
+                .map(|range| (*range.start(), *range.end()))
+                .collect(),
+            modified: state
+                .modified
+                .iter()
+                .map(|range| (*range.start(), *range.end()))
+                .collect(),
+            ignored: state
+                .ignored
+                .iter()
+                .map(|range| (*range.start(), *range.end()))
+                .collect(),
         }
     }
 }
@@ -85,7 +97,7 @@ async fn main() {
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
                 // axum logs rejections from built-in extractors with the `axum::rejection`
                 // target, at `TRACE` level. `axum::rejection=trace` enables showing those events
-                "service=debug,tower_http=debug,axum::rejection=trace".into()
+                "auditor=debug,tower_http=debug,axum::rejection=trace".into()
             }),
         )
         .with(tracing_subscriber::fmt::layer())
@@ -151,7 +163,7 @@ async fn handle_get_review_state(
     }
     let file_name = file_name.unwrap().replace(&state.repo_path, "");
     let file_name = file_name.replace(&state.repo_path, "");
-    return match get_review_state(&file_name, &db) {
+    match get_review_state(&file_name, &db) {
         Ok(state) => (StatusCode::CREATED, Json(state.into())),
         Err(err) => {
             tracing::error!("{}", err.message);
@@ -160,7 +172,7 @@ async fn handle_get_review_state(
                 Json(ReviewState::default()),
             )
         }
-    };
+    }
 }
 
 async fn handle_transform_review_state(
