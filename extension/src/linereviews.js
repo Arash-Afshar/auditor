@@ -33,7 +33,8 @@ function linereviewHandler(baseEndpoint) {
         fileName,
         startLine,
         endLine,
-        reviewState
+        reviewState,
+        totalLines,
     ) => {
         try {
             await fetch(reviewEndpoint, {
@@ -47,6 +48,7 @@ function linereviewHandler(baseEndpoint) {
                     start_line: startLine,
                     end_line: endLine,
                     review_state: reviewState,
+                    total_lines: totalLines,
                 }),
             });
             const state = await getReviewState(fileName);
@@ -77,9 +79,34 @@ function linereviewHandler(baseEndpoint) {
 
     const showReviewState = ({ reviewed, modified, ignored }) => {
         let activeEditor = vscode.window.activeTextEditor;
-        reviewed = new Set(reviewed);
-        modified = new Set(modified);
-        ignored = new Set(ignored);
+
+        let _reviewed = new Set();
+        let _modified = new Set();
+        let _ignored = new Set();
+
+        for (let i = 0; i < reviewed.length; i++) {
+            const [s, e] = reviewed[i];
+            for (let j = s; j <= e; j++) {
+                _reviewed.add(j);
+            }
+        }
+        for (let i = 0; i < modified.length; i++) {
+            const [s, e] = modified[i];
+            for (let j = s; j <= e; j++) {
+                _modified.add(j);
+            }
+        }
+        for (let i = 0; i < ignored.length; i++) {
+            const [s, e] = ignored[i];
+            for (let j = s; j <= e; j++) {
+                _ignored.add(j);
+            }
+        }
+
+        reviewed = _reviewed;
+        modified = _modified;
+        ignored = _ignored;
+
         if (activeEditor) {
             const reviewedLines = [];
             const modifiedLines = [];
@@ -112,7 +139,8 @@ function linereviewHandler(baseEndpoint) {
             [start, end] = [end, start];
         }
         const fileName = editor.document.fileName;
-        updateReviewState(fileName, start, end, state);
+        const totalLines = editor.document.lineCount;
+        updateReviewState(fileName, start, end, state, totalLines);
     };
 
     vscode.commands.registerTextEditorCommand(

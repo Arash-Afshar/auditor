@@ -182,6 +182,7 @@ async fn handle_transform_review_state(
     let git = Git::new(&state.repo_path).unwrap();
     let mut db = DB::new(state.db_path).unwrap();
     let file_name = payload.file_name;
+    let file_name = file_name.replace(&state.repo_path, "");
     match transform_review_state(&file_name, &mut db, &git) {
         Ok(state) => {
             db.save().unwrap();
@@ -207,6 +208,7 @@ async fn handle_update_review_state(
     payload.file_name = payload.file_name.replace(&state.repo_path, "");
     match update_review_state(payload, &mut db, &git) {
         Ok(_) => {
+            print!("Saving");
             db.save().unwrap();
             StatusCode::CREATED
         }
@@ -250,7 +252,6 @@ async fn handle_create_comment(
 //     ) {
 //         Ok(_) => StatusCode::CREATED,
 //         Err(err) => {
-//             println!("{}", err.message);
 //             StatusCode::BAD_REQUEST
 //         }
 //     }
