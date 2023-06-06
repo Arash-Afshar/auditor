@@ -16,9 +16,22 @@ pub struct CommentThread {
 }
 
 #[derive(Clone)]
-pub struct AllComments {
-    // file_name -> Comment thread
-    pub file_comments: HashMap<String, Vec<CommentThread>>,
+pub struct LineInfo {
+    pub lines_reviewed: usize,
+    pub lines_modified: usize,
+    pub total_lines: usize,
+}
+
+#[derive(Clone)]
+pub struct FileInfo {
+    pub line_info: LineInfo,
+    pub comments: Vec<CommentThread>,
+}
+
+#[derive(Clone)]
+pub struct AllInfo {
+    // file_name -> FileInfo
+    pub file_info: HashMap<String, FileInfo>,
 }
 
 impl Comment {

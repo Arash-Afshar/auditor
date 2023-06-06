@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{data::test_comment_data, AllComments, CommentThread};
+use crate::{data::test_comment_data, AllInfo, FileInfo, LineInfo};
 use leptos::{ev::MouseEvent, *};
 // use leptos_meta::*;
 // use leptos_router::*;
@@ -46,6 +46,8 @@ fn CaretDown(cx: Scope) -> impl IntoView {
 fn AccordionButton<F1, F2>(
     cx: Scope,
     file_name: String,
+    line_info: LineInfo,
+    is_first: bool,
     expanded: F1,
     on_click: F2,
 ) -> impl IntoView
@@ -53,22 +55,29 @@ where
     F1: Fn() -> bool,
     F2: Fn(MouseEvent) + 'static,
 {
-    let title = file_name;
-
     view! {
         cx,
-        <button
-            type="button"
-            class="flex items-center justify-between w-full p-5 font-medium text-left text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-            on:click=on_click
-        >
-            <span>{title}</span>
-            {if expanded() {
-                view!{cx, <CaretDown/>}.into_view(cx)
-            } else {
-                view!{cx, <CaretTop/>}.into_view(cx)
-            }}
-        </button>
+        <div class="flex flex-row gap-5  border border-gray-200 dark:border-gray-700" class=("rounded-t-xl", move || is_first)>
+            <div class="ml-5 flex flex-grow items-center gap-5 text-left text-gray-500 dark:text-gray-400 font-medium">
+                <div>{file_name}</div>
+                <div class="text-green-500">{100_f32 * line_info.lines_reviewed as f32/line_info.total_lines as f32}<span class="font-thin text-xs">" %"</span></div>
+                <div class="text-red-600">{100_f32 * line_info.lines_modified as f32/line_info.total_lines as f32}<span class="font-thin text-xs">" %"</span></div>
+            </div>
+            <div>
+                <button
+                    type="button"
+                    class="flex items-center justify-between w-full p-5 font-medium text-left text-gray-500 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    class=("rounded-t-xl", move || is_first)
+                    on:click=on_click
+                >
+                    {if expanded() {
+                        view!{cx, <CaretDown/>}.into_view(cx)
+                    } else {
+                        view!{cx, <CaretTop/>}.into_view(cx)
+                    }}
+                </button>
+            </div>
+        </div>
     }
 }
 
@@ -91,7 +100,8 @@ fn SearchBar(cx: Scope) -> impl IntoView {
 fn ExpandableComment<F>(
     cx: Scope,
     file_name: String,
-    comment_threads: Vec<CommentThread>,
+    file_info: FileInfo,
+    is_first: bool,
     expanded: ReadSignal<HashSet<String>>,
     on_click: F,
 ) -> impl IntoView
@@ -103,7 +113,7 @@ where
     let expanded = Signal::derive(cx, move || expanded().contains(&file_name_clone));
 
     let display = move || {
-        if comment_threads.is_empty() {
+        if file_info.comments.is_empty() {
             view! {
                 cx,
                  <p class="text-gray-500 dark:text-gray-400">
@@ -112,7 +122,8 @@ where
             }
             .into_view(cx)
         } else {
-            let contents = comment_threads
+            let contents = file_info
+                .comments
                 .clone()
                 .into_iter()
                 .map(|c| {
@@ -149,10 +160,10 @@ where
     view! {
         cx,
         <div id>
-            <AccordionButton file_name={file_name.clone()} expanded on_click/>
+            <AccordionButton file_name={file_name.clone()} line_info={file_info.line_info} is_first expanded on_click/>
         </div>
         <div class=("hidden", move || !expanded()) aria-labelledby={id}>
-            <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+            <div class="p-5 border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
                 {display}
             </div>
         </div>
@@ -160,26 +171,28 @@ where
 }
 
 #[component]
-fn Comments(cx: Scope, comments: AllComments) -> impl IntoView {
+fn Comments(cx: Scope, info: AllInfo) -> impl IntoView {
     // Contains the list of files that all are expanded
     let (expanded, set_expanded) = create_signal(cx, HashSet::<String>::default());
-    if !comments.file_comments.is_empty() {
-        let keys = Vec::from_iter(comments.file_comments.keys());
+    if !info.file_info.is_empty() {
+        let keys = Vec::from_iter(info.file_info.keys());
         let first_file_name = keys.first().unwrap();
         set_expanded.update(|set| {
             set.insert(first_file_name.to_string());
         });
     }
 
-    let comments = comments
-        .file_comments
+    let info = info
+        .file_info
         .into_iter()
-        .map(|(file_name, comment_threads)| {
+        .enumerate()
+        .map(|(idx, (file_name, file_info))| {
             view! {
                 cx,
                 <ExpandableComment
                     file_name={file_name.clone()}
-                    comment_threads
+                    file_info
+                    is_first={idx==0}
                     expanded
                     on_click=move |_| {
                         if expanded().contains(&file_name) {
@@ -196,21 +209,21 @@ fn Comments(cx: Scope, comments: AllComments) -> impl IntoView {
     view! {
         cx,
         <div>
-            {comments}
+            {info}
         </div>
     }
 }
 
 #[component]
 fn Home(cx: Scope) -> impl IntoView {
-    let comments = test_comment_data();
+    let info = test_comment_data();
     view! { cx,
         <div class="my-0 text-center min-h-screen min-w-full dark:bg-gray-950">
             <div class="container-xl  mx-auto max-w-3xl ">
                 <h2 class="p-6 text-4xl dark:text-gray-100">"Review Report"</h2>
                 <SearchBar/>
                 <div class="m-5">
-                    <Comments comments/>
+                    <Comments info/>
                 </div>
             </div>
         </div>
