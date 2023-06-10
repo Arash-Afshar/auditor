@@ -12,12 +12,6 @@ pub struct Comment {
     pub author: String,
 }
 
-#[derive(Clone)]
-pub struct AllInfo {
-    // file_name -> LatestFileInfo
-    pub file_info: HashMap<String, LatestFileInfo>,
-}
-
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct StoredReviewForFile {
     pub reviewed: Vec<RangeInclusive<usize>>,
@@ -51,11 +45,34 @@ impl StoredReviewForFile {
     }
 }
 #[derive(Serialize, Deserialize, Clone)]
-struct LatestFileInfos(HashMap<String, LatestFileInfo>);
+struct LatestFileInfos(Vec<LatestFileInfo>);
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LatestFileInfo {
     file_name: String,
     line_reviews: StoredReviewForFile,
     comments: HashMap<usize, Vec<Comment>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Filters {
+    pub only_with_comments: bool,
+    pub only_c_files: bool,
+    pub only_go_files: bool,
+    pub sort_by_modified: bool,
+    pub sort_by_reviewed: bool,
+    pub sort_by_name: bool,
+}
+
+impl Default for Filters {
+    fn default() -> Self {
+        Self {
+            only_with_comments: false,
+            only_c_files: true,
+            only_go_files: false,
+            sort_by_modified: false,
+            sort_by_reviewed: true,
+            sort_by_name: false,
+        }
+    }
 }

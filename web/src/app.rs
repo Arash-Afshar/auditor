@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 
-use crate::{AllInfo, LatestFileInfo, LatestFileInfos, StoredReviewForFile};
+use crate::{Filters, LatestFileInfo, LatestFileInfos, StoredReviewForFile};
 use leptos::{ev::MouseEvent, *};
 // use leptos_meta::*;
 // use leptos_router::*;
+
+// TODO:
+// - Align the percentages accross multiple rows
+// - Add search functionality
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -69,11 +73,12 @@ where
         cx,
         <div class="flex flex-row gap-5  border border-gray-200 dark:border-gray-700" class=("rounded-t-xl", move || is_first)>
             <div class="ml-5 flex flex-grow items-center gap-5 text-left text-gray-500 dark:text-gray-400 font-medium">
-                <div>{truncate(file_name)}</div>
-                <div class="text-blue-500">{if has_comments {"yes"} else {"no"}}</div>
-                <div class="text-green-500">{line_info.percent_reviewed()}<span class="font-thin text-xs">" %"</span></div>
-                <div class="text-red-600">{line_info.percent_modified()}<span class="font-thin text-xs">" %"</span></div>
-                <div class="text-gray-400">{line_info.percent_ignored()}<span class="font-thin text-xs">" %"</span></div>
+                <div class="min-w-[100px]">{truncate(file_name)}</div>
+                <div class="flex-grow"></div>
+                <div class="text-blue-500 min-w-[40px]">{if has_comments {"yes"} else {"no"}}</div>
+                <div class="text-green-500 min-w-[40px]">{line_info.percent_reviewed()}<span class="font-thin text-xs">" %"</span></div>
+                <div class="text-red-600 min-w-[40px]">{line_info.percent_modified()}<span class="font-thin text-xs">" %"</span></div>
+                <div class="text-gray-400 min-w-[40px]">{line_info.percent_ignored()}<span class="font-thin text-xs">" %"</span></div>
             </div>
             <div>
                 <button
@@ -184,22 +189,22 @@ where
 }
 
 #[component]
-fn Comments(cx: Scope, info: AllInfo) -> impl IntoView {
+fn Comments(cx: Scope, info: LatestFileInfos) -> impl IntoView {
     // Contains the list of files that all are expanded
     let (expanded, set_expanded) = create_signal(cx, HashSet::<String>::default());
-    if !info.file_info.is_empty() {
-        let keys = Vec::from_iter(info.file_info.keys());
-        let first_file_name = keys.first().unwrap();
+    if !info.0.is_empty() {
+        let first_file_name = info.0.first().unwrap();
         set_expanded.update(|set| {
-            set.insert(first_file_name.to_string());
+            set.insert(first_file_name.file_name.clone());
         });
     }
 
     let info = info
-        .file_info
+        .0
         .into_iter()
         .enumerate()
-        .map(|(idx, (file_name, file_info))| {
+        .map(|(idx, file_info)| {
+            let file_name = file_info.file_name.clone();
             view! {
                 cx,
                 <ExpandableComment
@@ -228,35 +233,146 @@ fn Comments(cx: Scope, info: AllInfo) -> impl IntoView {
 }
 
 #[component]
+fn FiltersView(cx: Scope, filters: RwSignal<Filters>) -> impl IntoView {
+    let sort_by_modified = move || filters().sort_by_modified;
+    let sort_by_reviewed = move || filters().sort_by_reviewed;
+    let sort_by_name = move || filters().sort_by_name;
+
+    view! {
+        cx,
+        <div class="flex flex-col gap-5 m-6 p-5 text-left dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg">
+            <div class="flex flex-row gap-5">
+                <div class="flex items-center">
+                    <input checked={move || filters().only_with_comments} on:change=move |ev| filters.update(|f| f.only_with_comments = event_target_checked(&ev)) id="comments_only" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                    <label for="comments_only" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Comments"</label>
+                </div>
+                <div class="flex items-center">
+                    <input checked={move || filters().only_c_files} on:change=move |ev| filters.update(|f| f.only_c_files = event_target_checked(&ev)) id="cpp" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                    <label for="cpp" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"C"</label>
+                </div>
+                <div class="flex items-center">
+                    <input checked={move || filters().only_go_files} on:change=move |ev| filters.update(|f| f.only_go_files = event_target_checked(&ev)) id="go" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                    <label for="go" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Go"</label>
+                </div>
+            </div>
+            <div class="flex flex-row gap-5">
+                <div class="flex items-center">
+                    <input checked={sort_by_modified} on:change=move |ev| filters.update(|f| {
+                        f.sort_by_modified = event_target_checked(&ev);
+                        if f.sort_by_modified {
+                            f.sort_by_name = false;
+                            f.sort_by_reviewed = false;
+                        }
+                    })
+                    id="sort-by-modified"
+                    name="sort"
+                    type="radio"
+                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                    <label for="sort-by-modified" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Sort by modified"</label>
+                </div>
+                <div class="flex items-center">
+                    <input checked={sort_by_reviewed} on:change=move |ev| filters.update(|f| {
+                        f.sort_by_reviewed = event_target_checked(&ev);
+                        if f.sort_by_reviewed {
+                            f.sort_by_name = false;
+                            f.sort_by_modified = false;
+                        }
+                    })
+                    id="sort-by-reviewed"
+                    name="sort"
+                    type="radio"
+                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                    <label for="sort-by-reviewed" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Sort by reviewed"</label>
+                </div>
+                <div class="flex items-center">
+                    <input checked={sort_by_name} on:change=move |ev| filters.update(|f| {
+                        f.sort_by_name = event_target_checked(&ev);
+                        if f.sort_by_name {
+                            f.sort_by_reviewed = false;
+                            f.sort_by_modified = false;
+                        }
+                    })
+                    id="sort-by-name"
+                    name="sort"
+                    type="radio"
+                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                    <label for="sort-by-name" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Sort by name"</label>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+#[component]
 fn Home(cx: Scope) -> impl IntoView {
+    let filters = create_rw_signal(cx, Filters::default());
+
     let asyc_comments = create_resource(
         cx,
         || (),
         |_| async move {
-            log!("loading data from API");
             let request_url = "http://localhost:3000/info";
             let response = reqwest::get(request_url).await.unwrap();
-            log!("Got response");
 
             let all_info: LatestFileInfos = response.json().await.unwrap();
-            log!("Converted response to comments");
+            // let all_info = LatestFileInfos(HashMap::default());
             all_info
         },
     );
 
-    fn transform(info: LatestFileInfos) -> AllInfo {
-        AllInfo { file_info: info.0 }
-    }
+    let filter = move |info: LatestFileInfos| {
+        let mut filtered: Vec<LatestFileInfo> = info
+            .0
+            .into_iter()
+            .filter(|info| {
+                let file_name = info.file_name.clone();
+                if filters().only_with_comments && info.comments.is_empty() {
+                    return false;
+                }
+                if filters().only_c_files
+                    && !(file_name.ends_with(".c")
+                        || file_name.ends_with(".cpp")
+                        || file_name.ends_with(".h"))
+                {
+                    return false;
+                }
+                if filters().only_go_files && !file_name.ends_with(".go") {
+                    return false;
+                }
+                true
+            })
+            .collect();
+
+        if filters().sort_by_name {
+            filtered.sort_by(|a, b| a.file_name.partial_cmp(&b.file_name).unwrap());
+        } else if filters().sort_by_modified {
+            filtered.sort_by(|a, b| {
+                b.line_reviews
+                    .percent_modified()
+                    .partial_cmp(&a.line_reviews.percent_modified())
+                    .unwrap()
+            });
+        } else if filters().sort_by_reviewed {
+            filtered.sort_by(|a, b| {
+                b.line_reviews
+                    .percent_reviewed()
+                    .partial_cmp(&a.line_reviews.percent_reviewed())
+                    .unwrap()
+            });
+        }
+        LatestFileInfos(filtered)
+    };
 
     view! { cx,
         <div class="my-0 text-center min-h-screen min-w-full dark:bg-gray-950">
             <div class="container-xl  mx-auto max-w-3xl ">
                 <h2 class="p-6 text-4xl dark:text-gray-100">"Review Report"</h2>
                 <SearchBar/>
+                <FiltersView filters />
                 <div class="m-5">
                     {move || match asyc_comments.read(cx) {
                         None => view! { cx, <p>"Loading..."</p> }.into_view(cx),
-                        Some(comments) => view! { cx, <Comments info={transform(comments)}/> }.into_view(cx)
+                        Some(comments) => view! { cx, <Comments info={filter(comments)}/> }.into_view(cx)
                     }}
                 </div>
             </div>

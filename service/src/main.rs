@@ -23,7 +23,7 @@ const REPO_PATH_ENV: &str = "REPO_PATH";
 const DB_PATH_ENV: &str = "DB_PATH";
 
 #[derive(Serialize)]
-struct LatestFileInfos(HashMap<String, LatestFileInfo>);
+struct LatestFileInfos(Vec<LatestFileInfo>);
 
 #[derive(Serialize)]
 struct LatestFileInfo {
@@ -200,7 +200,7 @@ async fn handle_get_review_state(
 
 async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json<LatestFileInfos>) {
     let db = DB::new(state.db_path).unwrap();
-    let mut latest = HashMap::default();
+    let mut latest = vec![];
     for (_, file_data) in db.file_dbs {
         let (file_name, line_reviews, comments) = file_data.get_latest_info();
         // TODO: use exclusion list + allowed file extensions
@@ -209,14 +209,11 @@ async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json
             || file_name.ends_with(".h")
             || file_name.ends_with(".go")
         {
-            latest.insert(
-                file_name.clone(),
-                LatestFileInfo {
-                    file_name,
-                    line_reviews,
-                    comments: comments.0,
-                },
-            );
+            latest.push(LatestFileInfo {
+                file_name,
+                line_reviews,
+                comments: comments.0,
+            });
         }
     }
     (StatusCode::CREATED, Json(LatestFileInfos(latest)))
