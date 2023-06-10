@@ -1,53 +1,61 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::RangeInclusive};
+
+use serde::{Deserialize, Serialize};
 
 pub mod app;
 pub mod data;
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Comment {
-    content: String,
-    author: String,
-}
-
-#[derive(Clone)]
-pub struct CommentThread {
-    pub line_number: u32,
-    pub content: Vec<Comment>,
-}
-
-#[derive(Clone)]
-pub struct LineInfo {
-    pub lines_reviewed: usize,
-    pub lines_modified: usize,
-    pub total_lines: usize,
-}
-
-#[derive(Clone)]
-pub struct FileInfo {
-    pub line_info: LineInfo,
-    pub comments: Vec<CommentThread>,
+    pub id: String,
+    pub body: String,
+    pub author: String,
 }
 
 #[derive(Clone)]
 pub struct AllInfo {
-    // file_name -> FileInfo
-    pub file_info: HashMap<String, FileInfo>,
+    // file_name -> LatestFileInfo
+    pub file_info: HashMap<String, LatestFileInfo>,
 }
 
-impl Comment {
-    fn new(content: &str, author: &str) -> Self {
-        Self {
-            content: content.to_string(),
-            author: author.to_string(),
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct StoredReviewForFile {
+    pub reviewed: Vec<RangeInclusive<usize>>,
+    pub modified: Vec<RangeInclusive<usize>>,
+    pub ignored: Vec<RangeInclusive<usize>>,
+    total_lines: usize,
 }
 
-impl CommentThread {
-    fn new(line_number: u32, content: Vec<Comment>) -> Self {
-        Self {
-            line_number,
-            content,
+impl StoredReviewForFile {
+    fn percent_helper(&self, list: &Vec<RangeInclusive<usize>>) -> usize {
+        if self.total_lines == 0 {
+            return 0;
         }
+        let mut total = 0;
+        for range in list {
+            total += *range.end() - range.start() + 1;
+        }
+        ((100 * total) as f32 / self.total_lines as f32) as usize
     }
+
+    fn percent_reviewed(&self) -> usize {
+        self.percent_helper(&self.reviewed)
+    }
+
+    fn percent_modified(&self) -> usize {
+        self.percent_helper(&self.modified)
+    }
+
+    fn percent_ignored(&self) -> usize {
+        self.percent_helper(&self.ignored)
+    }
+}
+#[derive(Serialize, Deserialize, Clone)]
+struct LatestFileInfos(HashMap<String, LatestFileInfo>);
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LatestFileInfo {
+    file_name: String,
+    line_reviews: StoredReviewForFile,
+    comments: HashMap<usize, Vec<Comment>>,
 }

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{data::test_comment_data, AllInfo, FileInfo, LineInfo};
+use crate::{AllInfo, LatestFileInfo, LatestFileInfos, StoredReviewForFile};
 use leptos::{ev::MouseEvent, *};
 // use leptos_meta::*;
 // use leptos_router::*;
@@ -46,7 +46,8 @@ fn CaretDown(cx: Scope) -> impl IntoView {
 fn AccordionButton<F1, F2>(
     cx: Scope,
     file_name: String,
-    line_info: LineInfo,
+    line_info: StoredReviewForFile,
+    has_comments: bool,
     is_first: bool,
     expanded: F1,
     on_click: F2,
@@ -55,13 +56,24 @@ where
     F1: Fn() -> bool,
     F2: Fn(MouseEvent) + 'static,
 {
+    let truncate = |name: String| {
+        let limit = 20;
+        if name.len() <= limit {
+            name
+        } else {
+            format!("...{}", name[name.len() - limit..].to_string())
+        }
+    };
+
     view! {
         cx,
         <div class="flex flex-row gap-5  border border-gray-200 dark:border-gray-700" class=("rounded-t-xl", move || is_first)>
             <div class="ml-5 flex flex-grow items-center gap-5 text-left text-gray-500 dark:text-gray-400 font-medium">
-                <div>{file_name}</div>
-                <div class="text-green-500">{100_f32 * line_info.lines_reviewed as f32/line_info.total_lines as f32}<span class="font-thin text-xs">" %"</span></div>
-                <div class="text-red-600">{100_f32 * line_info.lines_modified as f32/line_info.total_lines as f32}<span class="font-thin text-xs">" %"</span></div>
+                <div>{truncate(file_name)}</div>
+                <div class="text-blue-500">{if has_comments {"yes"} else {"no"}}</div>
+                <div class="text-green-500">{line_info.percent_reviewed()}<span class="font-thin text-xs">" %"</span></div>
+                <div class="text-red-600">{line_info.percent_modified()}<span class="font-thin text-xs">" %"</span></div>
+                <div class="text-gray-400">{line_info.percent_ignored()}<span class="font-thin text-xs">" %"</span></div>
             </div>
             <div>
                 <button
@@ -100,7 +112,7 @@ fn SearchBar(cx: Scope) -> impl IntoView {
 fn ExpandableComment<F>(
     cx: Scope,
     file_name: String,
-    file_info: FileInfo,
+    file_info: LatestFileInfo,
     is_first: bool,
     expanded: ReadSignal<HashSet<String>>,
     on_click: F,
@@ -112,6 +124,7 @@ where
     let file_name_clone = file_name.clone();
     let expanded = Signal::derive(cx, move || expanded().contains(&file_name_clone));
 
+    let has_comments = !file_info.comments.is_empty();
     let display = move || {
         if file_info.comments.is_empty() {
             view! {
@@ -126,18 +139,18 @@ where
                 .comments
                 .clone()
                 .into_iter()
-                .map(|c| {
+                .map(|(line_number, content)| {
                     view! {
                         cx,
                         <div class="flex flex-row gap-10">
-                            <div class="min-w-[50px]">{format!("line#{}", c.line_number)}</div>
+                            <div class="min-w-[50px]">{format!("line#{}", line_number)}</div>
                             <div class="flex-grow text-left">
-                                {c.content.iter().map(|comment| {
+                                {content.iter().map(|comment| {
                                     view!{
                                         cx,
                                         <div class="flex flex-row gap-5">
                                             <div class="min-w-[100px]">{format!("-{}:", comment.author.clone())}</div>
-                                            <div>{comment.content.clone()}</div>
+                                            <div>{comment.body.clone()}</div>
                                         </div>
                                     }
                                 }).collect_view(cx)}
@@ -160,7 +173,7 @@ where
     view! {
         cx,
         <div id>
-            <AccordionButton file_name={file_name.clone()} line_info={file_info.line_info} is_first expanded on_click/>
+            <AccordionButton file_name={file_name.clone()} line_info={file_info.line_reviews} has_comments is_first expanded on_click/>
         </div>
         <div class=("hidden", move || !expanded()) aria-labelledby={id}>
             <div class="p-5 border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
@@ -216,14 +229,35 @@ fn Comments(cx: Scope, info: AllInfo) -> impl IntoView {
 
 #[component]
 fn Home(cx: Scope) -> impl IntoView {
-    let info = test_comment_data();
+    let asyc_comments = create_resource(
+        cx,
+        || (),
+        |_| async move {
+            log!("loading data from API");
+            let request_url = "http://localhost:3000/info";
+            let response = reqwest::get(request_url).await.unwrap();
+            log!("Got response");
+
+            let all_info: LatestFileInfos = response.json().await.unwrap();
+            log!("Converted response to comments");
+            all_info
+        },
+    );
+
+    fn transform(info: LatestFileInfos) -> AllInfo {
+        AllInfo { file_info: info.0 }
+    }
+
     view! { cx,
         <div class="my-0 text-center min-h-screen min-w-full dark:bg-gray-950">
             <div class="container-xl  mx-auto max-w-3xl ">
                 <h2 class="p-6 text-4xl dark:text-gray-100">"Review Report"</h2>
                 <SearchBar/>
                 <div class="m-5">
-                    <Comments info/>
+                    {move || match asyc_comments.read(cx) {
+                        None => view! { cx, <p>"Loading..."</p> }.into_view(cx),
+                        Some(comments) => view! { cx, <Comments info={transform(comments)}/> }.into_view(cx)
+                    }}
                 </div>
             </div>
         </div>

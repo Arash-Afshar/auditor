@@ -1,7 +1,7 @@
 use web::app;
 
+use crate::app::App;
 use leptos::*;
-use crate::app::{App, AppProps};
 
 pub fn main() {
     _ = console_log::init_with_level(log::Level::Debug);
