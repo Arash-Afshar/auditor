@@ -27,6 +27,12 @@
 - `REPO_PATH=<path-to-the-repo-you-want-to-audit> DB_PATH=<path-to-parent-directory-to-store-db> cargo run --bin service -- --port 3000`
   - Use `cargo watch -- cargo run ...` during development for hot reloading
 
+### Run the web view
+
+- `cd web`
+- `trunk serve --open`
+- Go to `http://localhost:8080`
+
 
 ## Usage
 
@@ -48,5 +54,8 @@ Open the command pallet (cmd+shift+P) and search for the following. You can also
 - Mark liens as modified
 - Mark liens as reviewed
 - Mark liens as cleared
+- Mark liens as ignored
 
 Click on the `+` sign that appears on the line number gutter to leave a comment
+
+
