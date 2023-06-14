@@ -1,6 +1,6 @@
 use auditor::{
-    db::DB, get_review_state, git::Git, transform_review_state, update_review_state, FileComments,
-    StoredReviewForFile, UpdateReviewState,
+    db::DB, get_review_state, git::Git, transform_review_state, update_review_state, Comment,
+    FileComments, StoredReviewForFile, UpdateReviewState,
 };
 use axum::{
     extract::{Query, State},
@@ -8,14 +8,29 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use hyper::Method;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env, net::SocketAddr, time::Duration};
-use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
+use tower_http::{
+    classify::ServerErrorsFailureClass,
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 use tracing::{info_span, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const REPO_PATH_ENV: &str = "REPO_PATH";
 const DB_PATH_ENV: &str = "DB_PATH";
+
+#[derive(Serialize)]
+struct LatestFileInfos(Vec<LatestFileInfo>);
+
+#[derive(Serialize)]
+struct LatestFileInfo {
+    file_name: String,
+    line_reviews: StoredReviewForFile,
+    comments: HashMap<usize, Vec<Comment>>,
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -112,16 +127,24 @@ async fn main() {
         ),
     };
 
+    let cors = CorsLayer::new()
+        // allow `GET` and `POST` when accessing the resource
+        .allow_methods(vec![Method::GET, Method::POST])
+        // allow requests from any origin
+        .allow_origin(Any);
+
     let app = Router::new()
         .route("/", get(root))
         .route("/reviews", post(handle_update_review_state))
         .route("/reviews", get(handle_get_review_state))
+        .route("/info", get(handle_get_all_info))
         .route("/transform", post(handle_transform_review_state))
         .route("/comments", post(handle_create_comment))
         .route("/comments", get(handle_get_comments))
         .route("/comments", delete(handle_delete_comment))
         //.route("/comments/:comment_id", put(handle_update_comment))
         .with_state(app_state)
+        .layer(cors)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
@@ -173,6 +196,27 @@ async fn handle_get_review_state(
             )
         }
     }
+}
+
+async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json<LatestFileInfos>) {
+    let db = DB::new(state.db_path).unwrap();
+    let mut latest = vec![];
+    for (_, file_data) in db.file_dbs {
+        let (file_name, line_reviews, comments) = file_data.get_latest_info();
+        // TODO: use exclusion list + allowed file extensions
+        if file_name.ends_with(".cpp")
+            || file_name.ends_with(".c")
+            || file_name.ends_with(".h")
+            || file_name.ends_with(".go")
+        {
+            latest.push(LatestFileInfo {
+                file_name,
+                line_reviews,
+                comments: comments.0,
+            });
+        }
+    }
+    (StatusCode::CREATED, Json(LatestFileInfos(latest)))
 }
 
 async fn handle_transform_review_state(

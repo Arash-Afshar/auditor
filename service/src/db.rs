@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::{Comment, FileComments, MyError, StoredReviewForCommit, StoredReviewForFile};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct DBForFile {
+pub struct DBForFile {
     file_name: String,
     total_lines: usize,
     latest_reviewed_commit: String,
@@ -21,11 +21,24 @@ struct DBForFile {
     comments: FileComments,
 }
 
+impl DBForFile {
+    pub fn get_latest_info(&self) -> (String, StoredReviewForFile, FileComments) {
+        (
+            self.file_name.clone(),
+            self.commit_reviews
+                .get(&self.latest_reviewed_commit)
+                .unwrap()
+                .clone(),
+            self.comments.clone(),
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DB {
     db_dir: String,
     // Maps filepath to db data
-    file_dbs: HashMap<String, DBForFile>,
+    pub file_dbs: HashMap<String, DBForFile>,
     // Contains the list of excluded directories
     exclusions: Vec<String>,
 }
