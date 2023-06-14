@@ -43,7 +43,7 @@ Modify the `settings.json` file and add the following:
 
 ```
   "workbench.colorCustomizations": {
-    "auditor.reviewedBakcground":"#FFF00055",
+    "auditor.reviewedBackground":"#FFF00055",
     "auditor.modifiedBackground": "#FF000055",
     "auditor.ignoredBackground": "#D3D3D3F0"
   }
