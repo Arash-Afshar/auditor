@@ -3,7 +3,6 @@ use std::{collections::HashMap, ops::RangeInclusive};
 use serde::{Deserialize, Serialize};
 
 pub mod app;
-pub mod data;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Comment {
