@@ -24,7 +24,7 @@
 ### Run the server
 
 - `cd service`
-- `REPO_PATH=<path-to-the-repo-you-want-to-audit> DB_PATH=<path-to-parent-directory-to-store-db> cargo run --bin service -- --port 3000`
+- `REPO_PATH=<path-to-the-repo-you-want-to-audit> DB_PATH=<path-to-parent-directory-to-store-db> cargo run --bin auditor -- --port 3000`
   - Use `cargo watch -- cargo run ...` during development for hot reloading
 
 ### Run the web view
