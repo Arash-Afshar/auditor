@@ -29,6 +29,7 @@
 
 ### Run the web view
 
+- Install trunk: https://trunkrs.dev/#install
 - `cd web`
 - `trunk serve --open`
 - Go to `http://localhost:8080`
