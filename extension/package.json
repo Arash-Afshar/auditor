@@ -15,6 +15,17 @@
   ],
   "main": "src/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "auditor-allowed-extensions",
+        "extensions": [
+          ".go",
+          ".cpp",
+          ".c",
+          ".h"
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "auditor.transform",
