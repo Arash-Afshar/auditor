@@ -325,6 +325,9 @@ fn Home(cx: Scope) -> impl IntoView {
             .0
             .into_iter()
             .filter(|info| {
+                if info.line_reviews.percent_ignored() == 100 {
+                    return false;
+                }
                 let file_name = info.file_name.clone();
                 if filters().only_with_comments && info.comments.is_empty() {
                     return false;
@@ -354,9 +357,9 @@ fn Home(cx: Scope) -> impl IntoView {
             });
         } else if filters().sort_by_reviewed {
             filtered.sort_by(|a, b| {
-                b.line_reviews
+                a.line_reviews
                     .percent_reviewed()
-                    .partial_cmp(&a.line_reviews.percent_reviewed())
+                    .partial_cmp(&b.line_reviews.percent_reviewed())
                     .unwrap()
             });
         }
