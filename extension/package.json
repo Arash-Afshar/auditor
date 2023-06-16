@@ -29,23 +29,23 @@
     "commands": [
       {
         "command": "auditor.transform",
-        "title": "Update reviews to latest commit"
+        "title": "auditor: Update reviews to latest commit"
       },
       {
         "command": "auditor.markAsReviewed",
-        "title": "Mark lines as reviewed"
+        "title": "auditor: Mark lines as reviewed"
       },
       {
         "command": "auditor.markAsModified",
-        "title": "Mark lines as modified"
+        "title": "auditor: Mark lines as modified"
       },
       {
         "command": "auditor.clearReviews",
-        "title": "Mark lines as cleared"
+        "title": "auditor: Mark lines as cleared"
       },
       {
         "command": "auditor.markAsIgnored",
-        "title": "Mark lines as ignored"
+        "title": "auditor: Mark lines as ignored"
       },
       {
         "command": "auditor.createNote",
