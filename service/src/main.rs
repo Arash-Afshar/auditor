@@ -250,10 +250,11 @@ async fn handle_update_review_state(
     let mut db = DB::new(state.db_path).unwrap();
     let mut payload = payload;
     payload.file_name = payload.file_name.replace(&state.repo_path, "");
+    let file_name = payload.file_name.clone();
     match update_review_state(payload, &mut db, &git) {
         Ok(_) => {
             print!("Saving");
-            db.save().unwrap();
+            db.save_file(&file_name).unwrap();
             StatusCode::CREATED
         }
         Err(err) => {

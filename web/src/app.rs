@@ -199,7 +199,8 @@ fn Comments(cx: Scope, info: LatestFileInfos) -> impl IntoView {
         });
     }
 
-    let info = info
+    let info_view = info
+        .clone()
         .0
         .into_iter()
         .enumerate()
@@ -224,10 +225,14 @@ fn Comments(cx: Scope, info: LatestFileInfos) -> impl IntoView {
         })
         .collect_view(cx);
 
+    let file_count = move || info.0.len();
+
     view! {
         cx,
         <div>
-            {info}
+            <div class="dark:text-gray-100 text-left">"File count:"</div>
+            <div class="dark:text-gray-100 text-left">{file_count}</div>
+            {info_view}
         </div>
     }
 }

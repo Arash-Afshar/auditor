@@ -95,17 +95,23 @@ impl DB {
         // if std::path::Path::new(&self.path).exists() {
         //     fs::rename(&self.path, backup_path)?;
         // }
-        for (file_name, db_content) in &self.file_dbs {
-            let ser = serde_json::to_string(&db_content)?;
-            let mut s = DefaultHasher::new();
-            file_name.hash(&mut s);
-            let id_from_path = s.finish().to_string();
-            let name: Vec<&str> = file_name.split('/').collect();
-            let base_name = name.last().unwrap();
-            let db_path = format!("{}/db_{}-{}.json", &self.db_dir, base_name, id_from_path);
-            let mut output = File::create(db_path)?;
-            output.write_all(ser.as_bytes())?;
-        }
+        self.file_dbs.iter().for_each(|(file_name, _)| {
+            self.save_file(file_name).unwrap();
+        });
+        Ok(())
+    }
+
+    pub fn save_file(&self, file_name: &String) -> Result<(), MyError> {
+        let db_content = self.file_dbs.get(file_name).unwrap();
+        let ser = serde_json::to_string(&db_content)?;
+        let mut s = DefaultHasher::new();
+        file_name.hash(&mut s);
+        let id_from_path = s.finish().to_string();
+        let name: Vec<&str> = file_name.split('/').collect();
+        let base_name = name.last().unwrap();
+        let db_path = format!("{}/db_{}-{}.json", &self.db_dir, base_name, id_from_path);
+        let mut output = File::create(db_path)?;
+        output.write_all(ser.as_bytes())?;
         Ok(())
     }
 
