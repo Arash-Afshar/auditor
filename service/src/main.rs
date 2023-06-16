@@ -270,9 +270,14 @@ async fn handle_create_comment(
 ) -> (StatusCode, Json<String>) {
     let mut db = DB::new(state.db_path).unwrap();
     let file_name = payload.file_name.replace(&state.repo_path, "");
-    match db.add_new_comment(file_name, payload.line_number, payload.body, payload.author) {
+    match db.add_new_comment(
+        file_name.clone(),
+        payload.line_number,
+        payload.body,
+        payload.author,
+    ) {
         Ok(new_comment_id) => {
-            db.save().unwrap();
+            db.save_file(&file_name).unwrap();
             (StatusCode::CREATED, Json(new_comment_id))
         }
         Err(err) => {
@@ -308,9 +313,9 @@ async fn handle_delete_comment(
 ) -> StatusCode {
     let mut db = DB::new(state.db_path).unwrap();
     let file_name = payload.file_name.replace(&state.repo_path, "");
-    match db.delete_comment(file_name, payload.comment_id, payload.line_number) {
+    match db.delete_comment(file_name.clone(), payload.comment_id, payload.line_number) {
         Ok(_) => {
-            db.save().unwrap();
+            db.save_file(&file_name).unwrap();
             StatusCode::CREATED
         }
         Err(err) => {
