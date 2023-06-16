@@ -86,15 +86,25 @@ impl DB {
         Ok(db)
     }
 
+    pub fn new_single_file(db_dir: String, file_name: &String) -> Result<Self, MyError> {
+        let mut db = Self {
+            db_dir: db_dir.clone(),
+            exclusions: vec![],
+            file_dbs: HashMap::default(),
+        };
+
+        let path = Self::stored_file_name(file_name);
+        let path = format!("{db_dir}/{path}");
+        let mut file = File::open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        let deserialized: DBForFile = serde_json::from_str(&contents)?;
+        db.file_dbs
+            .insert(deserialized.file_name.clone(), deserialized);
+        Ok(db)
+    }
+
     pub fn save(&self) -> Result<(), MyError> {
-        // let start = SystemTime::now();
-        // let since_the_epoch = start
-        //     .duration_since(UNIX_EPOCH)
-        //     .expect("Time went backwards");
-        // let backup_path = format!("{}-{}.db", self.path, since_the_epoch.as_millis());
-        // if std::path::Path::new(&self.path).exists() {
-        //     fs::rename(&self.path, backup_path)?;
-        // }
         self.file_dbs.iter().for_each(|(file_name, _)| {
             self.save_file(file_name).unwrap();
         });
@@ -104,15 +114,19 @@ impl DB {
     pub fn save_file(&self, file_name: &String) -> Result<(), MyError> {
         let db_content = self.file_dbs.get(file_name).unwrap();
         let ser = serde_json::to_string(&db_content)?;
+        let db_path = format!("{}/{}", &self.db_dir, Self::stored_file_name(file_name));
+        let mut output = File::create(db_path)?;
+        output.write_all(ser.as_bytes())?;
+        Ok(())
+    }
+
+    fn stored_file_name(file_name: &String) -> String {
         let mut s = DefaultHasher::new();
         file_name.hash(&mut s);
         let id_from_path = s.finish().to_string();
         let name: Vec<&str> = file_name.split('/').collect();
         let base_name = name.last().unwrap();
-        let db_path = format!("{}/db_{}-{}.json", &self.db_dir, base_name, id_from_path);
-        let mut output = File::create(db_path)?;
-        output.write_all(ser.as_bytes())?;
-        Ok(())
+        format!("db_{}-{}.json", base_name, id_from_path)
     }
 
     pub fn latest_reviewed_commit(&self, file_name: &String) -> Option<String> {
