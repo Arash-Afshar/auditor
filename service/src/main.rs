@@ -247,10 +247,10 @@ async fn handle_update_review_state(
     Json(payload): Json<UpdateReviewState>,
 ) -> StatusCode {
     let git = Git::new(&state.repo_path).unwrap();
-    let mut db = DB::new(state.db_path).unwrap();
     let mut payload = payload;
     payload.file_name = payload.file_name.replace(&state.repo_path, "");
     let file_name = payload.file_name.clone();
+    let mut db = DB::new_single_file(state.db_path, &file_name).unwrap();
     match update_review_state(payload, &mut db, &git) {
         Ok(_) => {
             print!("Saving");
@@ -268,8 +268,8 @@ async fn handle_create_comment(
     State(state): State<AppState>,
     Json(payload): Json<CreateComment>,
 ) -> (StatusCode, Json<String>) {
-    let mut db = DB::new(state.db_path).unwrap();
     let file_name = payload.file_name.replace(&state.repo_path, "");
+    let mut db = DB::new_single_file(state.db_path, &file_name).unwrap();
     match db.add_new_comment(
         file_name.clone(),
         payload.line_number,
@@ -311,8 +311,8 @@ async fn handle_delete_comment(
     State(state): State<AppState>,
     Json(payload): Json<DeleteComment>,
 ) -> StatusCode {
-    let mut db = DB::new(state.db_path).unwrap();
     let file_name = payload.file_name.replace(&state.repo_path, "");
+    let mut db = DB::new_single_file(state.db_path, &file_name).unwrap();
     match db.delete_comment(file_name.clone(), payload.comment_id, payload.line_number) {
         Ok(_) => {
             db.save_file(&file_name).unwrap();
