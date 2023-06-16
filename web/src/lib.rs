@@ -28,7 +28,13 @@ impl StoredReviewForFile {
         for range in list {
             total += *range.end() - range.start() + 1;
         }
-        ((100 * total) as f32 / self.total_lines as f32) as usize
+        let percent = ((100 * total) as f32 / self.total_lines as f32) as usize;
+        // TODO: fix this in the backend. The problem is that when review ranges are merged, they don't take into account that the file line count may have been reduced.
+        if percent > 100 {
+            100
+        } else {
+            percent
+        }
     }
 
     fn percent_reviewed(&self) -> usize {
