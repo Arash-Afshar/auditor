@@ -179,13 +179,13 @@ async fn handle_get_review_state(
     State(state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
 ) -> (StatusCode, Json<ReviewState>) {
-    let db = DB::new(state.db_path).unwrap();
     let file_name = query.get(&"file_name".to_string());
     if file_name.is_none() {
         return (StatusCode::BAD_REQUEST, Json(ReviewState::default()));
     }
     let file_name = file_name.unwrap().replace(&state.repo_path, "");
     let file_name = file_name.replace(&state.repo_path, "");
+    let db = DB::new_single_file(state.db_path, &file_name).unwrap();
     match get_review_state(&file_name, &db) {
         Ok(state) => (StatusCode::CREATED, Json(state.into())),
         Err(err) => {
@@ -329,9 +329,9 @@ async fn handle_get_comments(
     State(state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
 ) -> (StatusCode, Json<FileComments>) {
-    let db = DB::new(state.db_path).unwrap();
     let file_name = query.get(&"file_name".to_string()).unwrap();
     let file_name = file_name.replace(&state.repo_path, "");
+    let db = DB::new_single_file(state.db_path, &file_name).unwrap();
 
     match db.get_file_comments(&file_name) {
         Some(comments) => (StatusCode::CREATED, Json(comments)),
