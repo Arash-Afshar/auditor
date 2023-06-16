@@ -1,6 +1,7 @@
 use auditor::{
-    db::DB, get_review_state, git::Git, transform_review_state, update_review_state, Comment,
-    FileComments, StoredReviewForFile, UpdateReviewState,
+    db::DB, get_review_state, git::Git, transform_review_state, update_metadata,
+    update_review_state, Comment, FileComments, Priority, StoredReviewForFile,
+    UpdateMetadataRequest, UpdateReviewState,
 };
 use axum::{
     extract::{Query, State},
@@ -30,6 +31,7 @@ struct LatestFileInfo {
     file_name: String,
     line_reviews: StoredReviewForFile,
     comments: HashMap<usize, Vec<Comment>>,
+    priority: Option<Priority>,
 }
 
 #[derive(Clone)]
@@ -142,6 +144,7 @@ async fn main() {
         .route("/comments", post(handle_create_comment))
         .route("/comments", get(handle_get_comments))
         .route("/comments", delete(handle_delete_comment))
+        .route("/metadata", post(handle_update_metadata))
         //.route("/comments/:comment_id", put(handle_update_comment))
         .with_state(app_state)
         .layer(cors)
@@ -202,7 +205,7 @@ async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json
     let db = DB::new(state.db_path).unwrap();
     let mut latest = vec![];
     for (_, file_data) in db.file_dbs {
-        let (file_name, line_reviews, comments) = file_data.get_latest_info();
+        let (file_name, line_reviews, comments, priority) = file_data.get_latest_info();
         // TODO: use exclusion list + allowed file extensions
         if file_name.ends_with(".cpp")
             || file_name.ends_with(".c")
@@ -213,6 +216,7 @@ async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json
                 file_name,
                 line_reviews,
                 comments: comments.0,
+                priority,
             });
         }
     }
@@ -339,5 +343,26 @@ async fn handle_get_comments(
             StatusCode::BAD_REQUEST,
             Json(FileComments(HashMap::default())),
         ),
+    }
+}
+
+async fn handle_update_metadata(
+    State(state): State<AppState>,
+    Json(payload): Json<UpdateMetadataRequest>,
+) -> StatusCode {
+    let mut payload = payload;
+    payload.file_name = payload.file_name.replace(&state.repo_path, "");
+    let file_name = payload.file_name.clone();
+    let mut db = DB::new_single_file(state.db_path, &file_name).unwrap();
+    match update_metadata(payload, &mut db) {
+        Ok(_) => {
+            print!("Saving");
+            db.save_file(&file_name).unwrap();
+            StatusCode::CREATED
+        }
+        Err(err) => {
+            tracing::error!("{}", err.message);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     }
 }

@@ -1,3 +1,7 @@
+use crate::{
+    Comment, FileComments, Metadata, MyError, Priority, StoredReviewForCommit, StoredReviewForFile,
+};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -9,8 +13,6 @@ use std::{
 };
 use uuid::Uuid;
 
-use crate::{Comment, FileComments, MyError, StoredReviewForCommit, StoredReviewForFile};
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DBForFile {
     file_name: String,
@@ -19,10 +21,11 @@ pub struct DBForFile {
     // Maps commit to reviews
     commit_reviews: HashMap<String, StoredReviewForFile>,
     comments: FileComments,
+    metadata: Option<Metadata>,
 }
 
 impl DBForFile {
-    pub fn get_latest_info(&self) -> (String, StoredReviewForFile, FileComments) {
+    pub fn get_latest_info(&self) -> (String, StoredReviewForFile, FileComments, Option<Priority>) {
         (
             self.file_name.clone(),
             self.commit_reviews
@@ -30,6 +33,7 @@ impl DBForFile {
                 .unwrap()
                 .clone(),
             self.comments.clone(),
+            self.metadata.as_ref().map(|m| m.priority.clone()),
         )
     }
 }
@@ -51,6 +55,7 @@ impl DBForFile {
             latest_reviewed_commit: "".to_string(),
             commit_reviews: HashMap::default(),
             comments: FileComments(HashMap::default()),
+            metadata: None,
         }
     }
 }
@@ -64,15 +69,14 @@ impl DB {
             file_dbs: HashMap::default(),
         };
 
+        let re = Regex::new(r"^db_.*\.(go|cpp|c|h)-\d*\.json$")?;
         for path in paths {
             let path = path?;
-            if path
-                .file_name()
-                .as_os_str()
-                .to_str()
-                .unwrap()
-                .starts_with("db_")
-            {
+            let base_name = path.file_name();
+            let base_name = base_name.as_os_str().to_str().unwrap();
+
+            if re.is_match(base_name) {
+                //if base_name.starts_with("db_") {
                 let path = path.path();
                 let path = path.to_str().unwrap();
                 let mut file = File::open(path)?;
@@ -285,6 +289,11 @@ impl DB {
         self.file_dbs
             .get(file_name)
             .map(|db_content| db_content.comments.clone())
+    }
+
+    pub fn set_metadata(&mut self, file_name: &String, metadata: Metadata) {
+        let db_content = self.file_dbs.get_mut(file_name).unwrap();
+        db_content.metadata = Some(metadata);
     }
 }
 

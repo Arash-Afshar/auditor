@@ -53,10 +53,19 @@ impl StoredReviewForFile {
 struct LatestFileInfos(Vec<LatestFileInfo>);
 
 #[derive(Serialize, Deserialize, Clone)]
+pub enum Priority {
+    High,
+    Medium,
+    Low,
+    Ignore,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct LatestFileInfo {
     file_name: String,
     line_reviews: StoredReviewForFile,
     comments: HashMap<usize, Vec<Comment>>,
+    priority: Option<Priority>,
 }
 
 #[derive(Clone, Debug)]

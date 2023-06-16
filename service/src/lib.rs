@@ -29,6 +29,25 @@ pub struct Comment {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FileComments(pub HashMap<usize, Vec<Comment>>);
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum Priority {
+    High,
+    Medium,
+    Low,
+    Ignore,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Metadata {
+    priority: Priority,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct UpdateMetadataRequest {
+    pub file_name: String,
+    pub metadata: Metadata,
+}
+
 #[derive(Deserialize, Debug)]
 pub enum State {
     Reviewed,
@@ -303,6 +322,11 @@ fn update_reviews(
         }
     };
     new_state
+}
+
+pub fn update_metadata(request: UpdateMetadataRequest, db: &mut DB) -> Result<(), MyError> {
+    db.set_metadata(&request.file_name, request.metadata);
+    Ok(())
 }
 
 #[cfg(test)]

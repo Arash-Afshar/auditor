@@ -1,13 +1,9 @@
 use std::collections::HashSet;
 
-use crate::{Filters, LatestFileInfo, LatestFileInfos, StoredReviewForFile};
+use crate::{Filters, LatestFileInfo, LatestFileInfos, Priority, StoredReviewForFile};
 use leptos::{ev::MouseEvent, *};
 // use leptos_meta::*;
 // use leptos_router::*;
-
-// TODO:
-// - Align the percentages accross multiple rows
-// - Add search functionality
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -52,6 +48,7 @@ fn AccordionButton<F1, F2>(
     file_name: String,
     line_info: StoredReviewForFile,
     has_comments: bool,
+    priority: Option<Priority>,
     is_first: bool,
     expanded: F1,
     on_click: F2,
@@ -75,6 +72,18 @@ where
             <div class="ml-5 flex flex-grow items-center gap-5 text-left text-gray-500 dark:text-gray-400 font-medium">
                 <div class="min-w-[100px]">{truncate(file_name)}</div>
                 <div class="flex-grow"></div>
+                {
+                    match priority {
+                        Some(priority) => match priority {
+                            Priority::High => view!{cx, <div class="text-red-400 min-w-[40px]">"High"</div>},
+                            Priority::Medium => view!{cx, <div class="text-green-600 min-w-[40px]">"Medium"</div>},
+                            Priority::Low => view!{cx, <div class="text-gray-500 min-w-[40px]">"Low"</div>},
+                            Priority::Ignore => view!{cx, <div class="text-gray-600 min-w-[40px]">"Ignored"</div>},
+                        },
+                        None => view!{cx, <div></div>}
+                    }
+                }
+
                 <div class="text-blue-500 min-w-[40px]">{if has_comments {"yes"} else {"no"}}</div>
                 <div class="text-green-500 min-w-[40px]">{line_info.percent_reviewed()}<span class="font-thin text-xs">" %"</span></div>
                 <div class="text-red-600 min-w-[40px]">{line_info.percent_modified()}<span class="font-thin text-xs">" %"</span></div>
@@ -132,6 +141,7 @@ where
     let expanded = Signal::derive(cx, move || expanded().contains(&file_name_clone));
 
     let has_comments = !file_info.comments.is_empty();
+    let priority = file_info.priority;
     let display = move || {
         if file_info.comments.is_empty() {
             view! {
@@ -180,7 +190,7 @@ where
     view! {
         cx,
         <div id>
-            <AccordionButton file_name={file_name.clone()} line_info={file_info.line_reviews} has_comments is_first expanded on_click/>
+            <AccordionButton file_name={file_name.clone()} line_info={file_info.line_reviews} has_comments priority is_first expanded on_click/>
         </div>
         <div class=("hidden", move || !expanded()) aria-labelledby={id}>
             <div class="p-5 border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
@@ -333,6 +343,9 @@ fn Home(cx: Scope) -> impl IntoView {
             .0
             .into_iter()
             .filter(|info| {
+                if let Some(Priority::Ignore) = &info.priority {
+                    return false;
+                }
                 if !search().is_empty() {
                     return info.file_name.contains(&search());
                 }
