@@ -99,7 +99,7 @@ where
 }
 
 #[component]
-fn SearchBar(cx: Scope) -> impl IntoView {
+fn SearchBar(cx: Scope, search: RwSignal<String>) -> impl IntoView {
     view! {
         cx,
         <div class="m-6">
@@ -108,7 +108,9 @@ fn SearchBar(cx: Scope) -> impl IntoView {
                 id="file_name"
                 class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                 placeholder="Search for file names" required
+                on:input=move |ev| search.update(|f| *f = event_target_value(&ev))
             />
+
         </div>
     }
 }
@@ -311,6 +313,7 @@ fn FiltersView(cx: Scope, filters: RwSignal<Filters>) -> impl IntoView {
 #[component]
 fn Home(cx: Scope) -> impl IntoView {
     let filters = create_rw_signal(cx, Filters::default());
+    let search = create_rw_signal(cx, String::new());
 
     let asyc_comments = create_resource(
         cx,
@@ -330,6 +333,9 @@ fn Home(cx: Scope) -> impl IntoView {
             .0
             .into_iter()
             .filter(|info| {
+                if !search().is_empty() {
+                    return info.file_name.contains(&search());
+                }
                 if info.line_reviews.percent_ignored() == 100 {
                     return false;
                 }
@@ -372,10 +378,10 @@ fn Home(cx: Scope) -> impl IntoView {
     };
 
     view! { cx,
-        <div class="my-0 text-center min-h-screen min-w-full dark:bg-gray-950">
+        <div class="pb-40 my-0 text-center min-h-screen min-w-full dark:bg-gray-950">
             <div class="container-xl  mx-auto max-w-3xl ">
                 <h2 class="p-6 text-4xl dark:text-gray-100">"Review Report"</h2>
-                <SearchBar/>
+                <SearchBar search/>
                 <FiltersView filters />
                 <div class="m-5">
                     {move || match asyc_comments.read(cx) {
