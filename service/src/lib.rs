@@ -3,6 +3,7 @@ use errors::AuditorError;
 use git::Git;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::RangeInclusive};
+pub mod config;
 pub mod db;
 pub mod errors;
 pub mod git;

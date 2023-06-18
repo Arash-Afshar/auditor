@@ -3,6 +3,9 @@ use thiserror::Error;
 /// WordCountError enumerates all possible errors returned by this library.
 #[derive(Error, Debug)]
 pub enum AuditorError {
+    #[error("Config is missing an item")]
+    MissingConfig(String),
+
     #[error("Comment id is not found")]
     UnknownCommentId(String),
 
@@ -32,4 +35,7 @@ pub enum AuditorError {
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    ConfigError(#[from] toml::de::Error),
 }
