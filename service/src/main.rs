@@ -192,7 +192,7 @@ async fn handle_get_review_state(
     match get_review_state(&file_name, &db) {
         Ok(state) => (StatusCode::CREATED, Json(state.into())),
         Err(err) => {
-            tracing::error!("{}", err.message);
+            tracing::error!("{}", err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ReviewState::default()),
@@ -205,7 +205,7 @@ async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json
     let db = DB::new(state.db_path).unwrap();
     let mut latest = vec![];
     for (_, file_data) in db.file_dbs {
-        let (file_name, line_reviews, comments, priority) = file_data.get_latest_info();
+        let (file_name, line_reviews, comments, priority) = file_data.get_latest_info().unwrap();
         // TODO: use exclusion list + allowed file extensions
         if file_name.ends_with(".cpp")
             || file_name.ends_with(".c")
@@ -237,7 +237,7 @@ async fn handle_transform_review_state(
             (StatusCode::CREATED, Json(state.into()))
         }
         Err(err) => {
-            tracing::error!("{}", err.message);
+            tracing::error!("{}", err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ReviewState::default()),
@@ -262,7 +262,7 @@ async fn handle_update_review_state(
             StatusCode::CREATED
         }
         Err(err) => {
-            tracing::error!("{}", err.message);
+            tracing::error!("{}", err);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
@@ -285,7 +285,7 @@ async fn handle_create_comment(
             (StatusCode::CREATED, Json(new_comment_id))
         }
         Err(err) => {
-            tracing::error!("{}", err.message);
+            tracing::error!("{}", err);
             (StatusCode::BAD_REQUEST, Json("".to_string()))
         }
     }
@@ -323,7 +323,7 @@ async fn handle_delete_comment(
             StatusCode::CREATED
         }
         Err(err) => {
-            tracing::error!("{}", err.message);
+            tracing::error!("{}", err);
             StatusCode::BAD_REQUEST
         }
     }
@@ -361,7 +361,7 @@ async fn handle_update_metadata(
             StatusCode::CREATED
         }
         Err(err) => {
-            tracing::error!("{}", err.message);
+            tracing::error!("{}", err);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }

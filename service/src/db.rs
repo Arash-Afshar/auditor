@@ -1,5 +1,6 @@
 use crate::{
-    Comment, FileComments, Metadata, MyError, Priority, StoredReviewForCommit, StoredReviewForFile,
+    AuditorError, Comment, FileComments, Metadata, Priority, StoredReviewForCommit,
+    StoredReviewForFile,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -25,16 +26,20 @@ pub struct DBForFile {
 }
 
 impl DBForFile {
-    pub fn get_latest_info(&self) -> (String, StoredReviewForFile, FileComments, Option<Priority>) {
-        (
+    pub fn get_latest_info(
+        &self,
+    ) -> Result<(String, StoredReviewForFile, FileComments, Option<Priority>), AuditorError> {
+        Ok((
             self.file_name.clone(),
             self.commit_reviews
                 .get(&self.latest_reviewed_commit)
-                .unwrap()
+                .ok_or(AuditorError::UnknownCommit(
+                    self.latest_reviewed_commit.clone(),
+                ))?
                 .clone(),
             self.comments.clone(),
             self.metadata.as_ref().map(|m| m.priority.clone()),
-        )
+        ))
     }
 }
 
@@ -61,8 +66,8 @@ impl DBForFile {
 }
 
 impl DB {
-    pub fn new(db_dir: String) -> Result<Self, MyError> {
-        let paths = fs::read_dir(db_dir.clone()).unwrap();
+    pub fn new(db_dir: String) -> Result<Self, AuditorError> {
+        let paths = fs::read_dir(db_dir.clone())?;
         let mut db = Self {
             db_dir,
             exclusions: vec![],
@@ -73,12 +78,15 @@ impl DB {
         for path in paths {
             let path = path?;
             let base_name = path.file_name();
-            let base_name = base_name.as_os_str().to_str().unwrap();
+            let base_name = base_name
+                .as_os_str()
+                .to_str()
+                .ok_or(AuditorError::OsStringError)?;
 
             if re.is_match(base_name) {
                 //if base_name.starts_with("db_") {
                 let path = path.path();
-                let path = path.to_str().unwrap();
+                let path = path.to_str().ok_or(AuditorError::OsStringError)?;
                 let mut file = File::open(path)?;
                 let mut contents = String::new();
                 file.read_to_string(&mut contents)?;
@@ -90,14 +98,14 @@ impl DB {
         Ok(db)
     }
 
-    pub fn new_single_file(db_dir: String, file_name: &String) -> Result<Self, MyError> {
+    pub fn new_single_file(db_dir: String, file_name: &String) -> Result<Self, AuditorError> {
         let mut db = Self {
             db_dir: db_dir.clone(),
             exclusions: vec![],
             file_dbs: HashMap::default(),
         };
 
-        let path = Self::stored_file_name(file_name);
+        let path = Self::stored_file_name(file_name)?;
         let path = format!("{db_dir}/{path}");
         let mut file = File::open(path)?;
         let mut contents = String::new();
@@ -108,29 +116,37 @@ impl DB {
         Ok(db)
     }
 
-    pub fn save(&self) -> Result<(), MyError> {
-        self.file_dbs.iter().for_each(|(file_name, _)| {
-            self.save_file(file_name).unwrap();
-        });
+    pub fn save(&self) -> Result<(), AuditorError> {
+        self.file_dbs
+            .iter()
+            .try_for_each(|(file_name, _)| -> Result<(), AuditorError> {
+                self.save_file(file_name)?;
+                Ok(())
+            })?;
         Ok(())
     }
 
-    pub fn save_file(&self, file_name: &String) -> Result<(), MyError> {
-        let db_content = self.file_dbs.get(file_name).unwrap();
+    pub fn save_file(&self, file_name: &String) -> Result<(), AuditorError> {
+        let db_content = self
+            .file_dbs
+            .get(file_name)
+            .ok_or(AuditorError::UnknownFileName(file_name.clone()))?;
         let ser = serde_json::to_string(&db_content)?;
-        let db_path = format!("{}/{}", &self.db_dir, Self::stored_file_name(file_name));
+        let db_path = format!("{}/{}", &self.db_dir, Self::stored_file_name(file_name)?);
         let mut output = File::create(db_path)?;
         output.write_all(ser.as_bytes())?;
         Ok(())
     }
 
-    fn stored_file_name(file_name: &String) -> String {
+    fn stored_file_name(file_name: &String) -> Result<String, AuditorError> {
         let mut s = DefaultHasher::new();
         file_name.hash(&mut s);
         let id_from_path = s.finish().to_string();
         let name: Vec<&str> = file_name.split('/').collect();
-        let base_name = name.last().unwrap();
-        format!("db_{}-{}.json", base_name, id_from_path)
+        let base_name = name
+            .last()
+            .ok_or(AuditorError::InvalidAbsolutePath(file_name.clone()))?;
+        Ok(format!("db_{}-{}.json", base_name, id_from_path))
     }
 
     pub fn latest_reviewed_commit(&self, file_name: &String) -> Option<String> {
@@ -144,25 +160,25 @@ impl DB {
             exclusions: vec![],
             files: HashMap::default(),
         };
-        if commit.is_none() {
-            return StoredReviewForCommit::new(self.exclusions.clone());
+        if let Some(commit) = commit {
+            for (file_name, db_content) in &self.file_dbs {
+                let review = match db_content.commit_reviews.get(commit) {
+                    Some(review) => review.clone(),
+                    None => StoredReviewForFile::default(),
+                };
+                commit_reviews.files.insert(file_name.clone(), review);
+            }
+            commit_reviews
+        } else {
+            StoredReviewForCommit::new(self.exclusions.clone())
         }
-        let commit = commit.clone().unwrap();
-        for (file_name, db_content) in &self.file_dbs {
-            let review = match db_content.commit_reviews.get(&commit) {
-                Some(review) => review.clone(),
-                None => StoredReviewForFile::default(),
-            };
-            commit_reviews.files.insert(file_name.clone(), review);
-        }
-        commit_reviews
     }
 
     pub fn store_review_status(
         &mut self,
         commit: &str,
         state: &StoredReviewForCommit,
-    ) -> Result<(), MyError> {
+    ) -> Result<(), AuditorError> {
         for file_name in state.files.keys() {
             let db_content = self
                 .file_dbs
@@ -176,7 +192,7 @@ impl DB {
                     .get(file_name)
                     .cloned()
                     .or_else(|| Some(StoredReviewForFile::default()))
-                    .unwrap()
+                    .expect("It is always Some(_)")
                     .clone(),
             );
         }
@@ -189,7 +205,7 @@ impl DB {
         line_number: usize,
         body: String,
         author: String,
-    ) -> Result<String, MyError> {
+    ) -> Result<String, AuditorError> {
         let id = Uuid::new_v4().to_string();
         let comment = Comment {
             id: id.clone(),
@@ -210,15 +226,18 @@ impl DB {
         file_name: String,
         comment_id: String,
         line_number: usize,
-    ) -> Result<(), MyError> {
+    ) -> Result<(), AuditorError> {
         let current_comments = self
             .file_dbs
             .get_mut(&file_name)
-            .unwrap()
+            .ok_or(AuditorError::UnknownFileName(file_name.clone()))?
             .comments
             .0
             .get_mut(&line_number)
-            .unwrap();
+            .ok_or(AuditorError::UnknownLinenumberInFile(
+                line_number,
+                file_name.clone(),
+            ))?;
 
         let mut index = None;
         for (i, comment) in current_comments.iter().enumerate() {
@@ -227,23 +246,20 @@ impl DB {
                 break;
             }
         }
-        if index.is_none() {
-            return Err(MyError {
-                message: "comment id does not exist".to_string(),
-            });
+        if let Some(index) = index {
+            current_comments.remove(index);
+            if current_comments.is_empty() {
+                self.file_dbs
+                    .get_mut(&file_name)
+                    .ok_or(AuditorError::UnknownFileName(file_name.clone()))?
+                    .comments
+                    .0
+                    .remove(&line_number);
+            }
+            Ok(())
+        } else {
+            Err(AuditorError::UnknownCommentId(comment_id))
         }
-        let index = index.unwrap();
-
-        current_comments.remove(index);
-        if current_comments.is_empty() {
-            self.file_dbs
-                .get_mut(&file_name)
-                .unwrap()
-                .comments
-                .0
-                .remove(&line_number);
-        }
-        Ok(())
     }
 
     pub fn update_comment(
@@ -253,36 +269,27 @@ impl DB {
         line_number: usize,
         body: String,
         author: String,
-    ) -> Result<(), MyError> {
+    ) -> Result<(), AuditorError> {
         let current_comments = self
             .file_dbs
             .get_mut(&file_name)
-            .unwrap()
+            .ok_or(AuditorError::UnknownFileName(file_name.clone()))?
             .comments
             .0
             .get_mut(&line_number)
-            .unwrap();
+            .ok_or(AuditorError::UnknownLinenumberInFile(
+                line_number,
+                file_name.clone(),
+            ))?;
 
-        let mut index = None;
-        for (i, comment) in current_comments.iter().enumerate() {
+        for comment in current_comments.iter_mut() {
             if comment.id == comment_id {
-                index = Some(i);
-                break;
+                comment.body = body;
+                comment.author = author;
+                return Ok(());
             }
         }
-        if index.is_none() {
-            return Err(MyError {
-                message: "comment id does not exist".to_string(),
-            });
-        }
-        let index = index.unwrap();
-
-        let comment = current_comments.get_mut(index).unwrap();
-
-        comment.body = body;
-        comment.author = author;
-
-        Ok(())
+        Err(AuditorError::UnknownCommentId(comment_id))
     }
 
     pub fn get_file_comments(&self, file_name: &String) -> Option<FileComments> {
@@ -291,9 +298,17 @@ impl DB {
             .map(|db_content| db_content.comments.clone())
     }
 
-    pub fn set_metadata(&mut self, file_name: &String, metadata: Metadata) {
-        let db_content = self.file_dbs.get_mut(file_name).unwrap();
+    pub fn set_metadata(
+        &mut self,
+        file_name: &String,
+        metadata: Metadata,
+    ) -> Result<(), AuditorError> {
+        let db_content = self
+            .file_dbs
+            .get_mut(file_name)
+            .ok_or(AuditorError::UnknownFileName(file_name.clone()))?;
         db_content.metadata = Some(metadata);
+        Ok(())
     }
 }
 
@@ -339,13 +354,5 @@ mod tests {
             state.files.get(&file1).unwrap(),
             retrieved_state.files.get(&file1).unwrap()
         );
-    }
-
-    #[test]
-    fn test_inspect_db() {
-        // // TODO: make this into a cmd
-        // let path = "main.db".to_string();
-        // let db = DB::new(path).unwrap();
-        // println!("{:?}", db);
     }
 }
