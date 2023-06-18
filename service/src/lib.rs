@@ -1,23 +1,11 @@
 use db::DB;
+use errors::AuditorError;
 use git::Git;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display, ops::RangeInclusive};
+use std::{collections::HashMap, ops::RangeInclusive};
 pub mod db;
+pub mod errors;
 pub mod git;
-
-// TODO: rewrite with thiserror and anyhow
-#[derive(Debug)]
-pub struct MyError {
-    pub message: String,
-}
-
-impl<E: Display> From<E> for MyError {
-    fn from(value: E) -> Self {
-        MyError {
-            message: value.to_string(),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Comment {
@@ -227,7 +215,7 @@ impl StoredReviewForFile {
     }
 }
 
-pub fn get_review_state(file_name: &String, db: &DB) -> Result<StoredReviewForFile, MyError> {
+pub fn get_review_state(file_name: &String, db: &DB) -> Result<StoredReviewForFile, AuditorError> {
     let commit = db.latest_reviewed_commit(file_name);
     let state = db.review_status_of_commit(&commit);
     Ok(match state.files.get(file_name) {
@@ -240,13 +228,13 @@ pub fn transform_review_state(
     file_name: &String,
     db: &mut DB,
     git: &Git,
-) -> Result<StoredReviewForFile, MyError> {
+) -> Result<StoredReviewForFile, AuditorError> {
     let commit = db.latest_reviewed_commit(file_name);
     let mut state = db.review_status_of_commit(&commit);
     let diff = git.diff_current_and_commit(commit, (state.exclusions).as_ref())?;
     if diff.is_some() {
         state = transform_reviews(&state, diff);
-        db.store_review_status(&git.current_commit(), &state)?;
+        db.store_review_status(&git.current_commit()?, &state)?;
     }
     Ok(match state.files.get(file_name) {
         Some(state) => state.clone(),
@@ -258,11 +246,11 @@ pub fn update_review_state(
     changes: UpdateReviewState,
     db: &mut DB,
     git: &Git,
-) -> Result<(), MyError> {
+) -> Result<(), AuditorError> {
     let commit = db.latest_reviewed_commit(&changes.file_name);
     let state = db.review_status_of_commit(&commit);
     let new_state = update_reviews(&state, changes);
-    db.store_review_status(&git.current_commit(), &new_state)?;
+    db.store_review_status(&git.current_commit()?, &new_state)?;
     Ok(())
 }
 
@@ -324,9 +312,8 @@ fn update_reviews(
     new_state
 }
 
-pub fn update_metadata(request: UpdateMetadataRequest, db: &mut DB) -> Result<(), MyError> {
-    db.set_metadata(&request.file_name, request.metadata);
-    Ok(())
+pub fn update_metadata(request: UpdateMetadataRequest, db: &mut DB) -> Result<(), AuditorError> {
+    db.set_metadata(&request.file_name, request.metadata)
 }
 
 #[cfg(test)]
