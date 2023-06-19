@@ -3,6 +3,7 @@ const vscode = require("vscode");
 const fetch = require("node-fetch");
 
 function linereviewHandler(baseEndpoint) {
+    const auditingFiletypes = vscode.workspace.getConfiguration().get('auditor.auditingFiletypes');
     const reviewEndpoint = baseEndpoint + 'reviews';
     const transformReviewEndpoint = baseEndpoint + 'transform';
 
@@ -79,6 +80,9 @@ function linereviewHandler(baseEndpoint) {
 
     const showReviewState = ({ reviewed, modified, ignored }) => {
         let activeEditor = vscode.window.activeTextEditor;
+        if (!auditingFiletypes.includes(vscode.window.activeTextEditor.document.languageId)) {
+            return
+        }
 
         let _reviewed = new Set();
         let _modified = new Set();

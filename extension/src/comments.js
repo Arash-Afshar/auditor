@@ -13,6 +13,8 @@ const newNoteComment = (id, body, mode, author, parent, contextValue) => {
 }
 
 async function commentHandler(context, endpoint) {
+    const auditingFiletypes = vscode.workspace.getConfiguration().get('auditor.auditingFiletypes');
+
     endpoint += 'comments';
     const commentController = vscode.comments.createCommentController(
         "audit.comment-controller",
@@ -23,8 +25,9 @@ async function commentHandler(context, endpoint) {
     // A `CommentingRangeProvider` controls where gutter decorations that allow adding comments are shown
     commentController.commentingRangeProvider = {
         provideCommentingRanges: (document) => {
-            const lineCount = document.lineCount;
-            return [new vscode.Range(0, 0, lineCount - 1, 0)];
+            if (auditingFiletypes.includes(document.languageId)) {
+                return [new vscode.Range(0, 0, document.lineCount - 1, 0)];
+            }
         },
     };
 

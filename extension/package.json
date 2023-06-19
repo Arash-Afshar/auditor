@@ -1,5 +1,6 @@
 {
-  "name": "auditor1",
+  "name": "auditor6",
+  "publisher": "Arash-Afshar",
   "displayName": "auditor",
   "description": "Track and manage audits/reviews of large code changes",
   "repository": "https://github.com/Arash-Afshar/auditor",
@@ -15,17 +16,6 @@
   ],
   "main": "src/extension.js",
   "contributes": {
-    "languages": [
-      {
-        "id": "auditor-allowed-extensions",
-        "extensions": [
-          ".go",
-          ".cpp",
-          ".c",
-          ".h"
-        ]
-      }
-    ],
     "commands": [
       {
         "command": "auditor.transform",
@@ -194,7 +184,18 @@
           "highContrast": "#FF000055"
         }
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Auditing Filetypes",
+      "properties": {
+        "auditor.auditingFiletypes": {
+          "type": "array",
+          "default": ["go"],
+          "description": "Only the codes in the listed filetypes will be colored and commented"
+        }
+      }
+    }
   },
   "scripts": {
     "lint": "eslint .",
