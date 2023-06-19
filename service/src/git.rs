@@ -1,4 +1,5 @@
-use crate::{AuditorError, Diff, LineDiff};
+use crate::{Diff, LineDiff};
+use anyhow::Result;
 use git2::{Oid, Patch, Repository, Tree};
 use std::collections::HashMap;
 
@@ -7,17 +8,17 @@ pub struct Git {
 }
 
 impl Git {
-    pub fn new(path: &String) -> Result<Self, AuditorError> {
+    pub fn new(path: &String) -> Result<Self> {
         let repo = Repository::open(path)?;
         Ok(Git { repo })
     }
 
-    pub fn current_commit(&self) -> Result<String, AuditorError> {
+    pub fn current_commit(&self) -> Result<String> {
         let commit = self.repo.head()?.peel_to_commit()?;
         Ok(commit.id().to_string())
     }
 
-    pub fn get_tree_from_commit(&self, commit: &str) -> Result<Tree, AuditorError> {
+    pub fn get_tree_from_commit(&self, commit: &str) -> Result<Tree> {
         let commit = Oid::from_str(commit)?;
         let commit = self.repo.find_commit(commit)?;
         let tree = commit.tree()?;
@@ -28,7 +29,7 @@ impl Git {
         &self,
         old_commit: Option<String>,
         exclusions: &Vec<String>,
-    ) -> Result<Option<Diff>, AuditorError> {
+    ) -> Result<Option<Diff>> {
         if old_commit.is_none() {
             return Ok(None);
         }

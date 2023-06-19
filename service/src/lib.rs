@@ -1,8 +1,10 @@
+use anyhow::Result;
 use db::DB;
 use errors::AuditorError;
 use git::Git;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::RangeInclusive};
+pub mod config;
 pub mod db;
 pub mod errors;
 pub mod git;
@@ -215,7 +217,7 @@ impl StoredReviewForFile {
     }
 }
 
-pub fn get_review_state(file_name: &String, db: &DB) -> Result<StoredReviewForFile, AuditorError> {
+pub fn get_review_state(file_name: &String, db: &DB) -> Result<StoredReviewForFile> {
     let commit = db.latest_reviewed_commit(file_name);
     let state = db.review_status_of_commit(&commit);
     Ok(match state.files.get(file_name) {
@@ -228,7 +230,7 @@ pub fn transform_review_state(
     file_name: &String,
     db: &mut DB,
     git: &Git,
-) -> Result<StoredReviewForFile, AuditorError> {
+) -> Result<StoredReviewForFile> {
     let commit = db.latest_reviewed_commit(file_name);
     let mut state = db.review_status_of_commit(&commit);
     let diff = git.diff_current_and_commit(commit, (state.exclusions).as_ref())?;
@@ -242,11 +244,7 @@ pub fn transform_review_state(
     })
 }
 
-pub fn update_review_state(
-    changes: UpdateReviewState,
-    db: &mut DB,
-    git: &Git,
-) -> Result<(), AuditorError> {
+pub fn update_review_state(changes: UpdateReviewState, db: &mut DB, git: &Git) -> Result<()> {
     let commit = db.latest_reviewed_commit(&changes.file_name);
     let state = db.review_status_of_commit(&commit);
     let new_state = update_reviews(&state, changes);
@@ -312,7 +310,7 @@ fn update_reviews(
     new_state
 }
 
-pub fn update_metadata(request: UpdateMetadataRequest, db: &mut DB) -> Result<(), AuditorError> {
+pub fn update_metadata(request: UpdateMetadataRequest, db: &mut DB) -> Result<()> {
     db.set_metadata(&request.file_name, request.metadata)
 }
 

@@ -1,7 +1,10 @@
 use auditor::{
-    db::DB, get_review_state, git::Git, transform_review_state, update_metadata,
-    update_review_state, Comment, FileComments, Priority, StoredReviewForFile,
-    UpdateMetadataRequest, UpdateReviewState,
+    config::{Config, ConfigBuilder},
+    db::DB,
+    get_review_state,
+    git::Git,
+    transform_review_state, update_metadata, update_review_state, Comment, FileComments, Priority,
+    StoredReviewForFile, UpdateMetadataRequest, UpdateReviewState,
 };
 use axum::{
     extract::{Query, State},
@@ -11,7 +14,7 @@ use axum::{
 };
 use hyper::Method;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tower_http::{
     classify::ServerErrorsFailureClass,
     cors::{Any, CorsLayer},
@@ -19,9 +22,6 @@ use tower_http::{
 };
 use tracing::{info_span, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-const REPO_PATH_ENV: &str = "REPO_PATH";
-const DB_PATH_ENV: &str = "DB_PATH";
 
 #[derive(Serialize)]
 struct LatestFileInfos(Vec<LatestFileInfo>);
@@ -34,10 +34,9 @@ struct LatestFileInfo {
     priority: Option<Priority>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppState {
-    repo_path: String,
-    db_path: String,
+    config: Config,
 }
 
 #[derive(Deserialize)]
@@ -120,14 +119,18 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let app_state = match (env::var(REPO_PATH_ENV), env::var(DB_PATH_ENV)) {
-        // TODO: get dir exclusion as well
-        (Ok(repo_path), Ok(db_path)) => AppState { repo_path, db_path },
-        _ => panic!(
-            "Environment paths not set {}, {}",
-            REPO_PATH_ENV, DB_PATH_ENV
-        ),
+    let mut builder = ConfigBuilder::default();
+    let app_state = AppState {
+        config: builder
+            .toml("./config.toml")
+            .unwrap()
+            .env()
+            .unwrap()
+            .build()
+            .unwrap(),
     };
+
+    println!("{app_state:?}");
 
     let cors = CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource
@@ -186,9 +189,11 @@ async fn handle_get_review_state(
     if file_name.is_none() {
         return (StatusCode::BAD_REQUEST, Json(ReviewState::default()));
     }
-    let file_name = file_name.unwrap().replace(&state.repo_path, "");
-    let file_name = file_name.replace(&state.repo_path, "");
-    let db = DB::new_single_file(state.db_path, &file_name).unwrap();
+    let file_name = file_name
+        .unwrap()
+        .replace(&state.config.repository_path, "");
+    let file_name = file_name.replace(&state.config.repository_path, "");
+    let db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
     match get_review_state(&file_name, &db) {
         Ok(state) => (StatusCode::CREATED, Json(state.into())),
         Err(err) => {
@@ -202,23 +207,47 @@ async fn handle_get_review_state(
 }
 
 async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json<LatestFileInfos>) {
-    let db = DB::new(state.db_path).unwrap();
+    let db = DB::new(state.config.db_path).unwrap();
     let mut latest = vec![];
     for (_, file_data) in db.file_dbs {
         let (file_name, line_reviews, comments, priority) = file_data.get_latest_info().unwrap();
-        // TODO: use exclusion list + allowed file extensions
-        if file_name.ends_with(".cpp")
-            || file_name.ends_with(".c")
-            || file_name.ends_with(".h")
-            || file_name.ends_with(".go")
-        {
-            latest.push(LatestFileInfo {
-                file_name,
-                line_reviews,
-                comments: comments.0,
-                priority,
-            });
+
+        let mut extension_allowed = false;
+        for ext in &state.config.allowed_file_extensions {
+            if file_name.ends_with(ext) {
+                extension_allowed = true;
+            }
         }
+        if !extension_allowed {
+            continue;
+        }
+
+        let mut prefix_allowed = false;
+        for prefix in &state.config.included_prefixes {
+            if file_name.starts_with(prefix) {
+                prefix_allowed = true;
+            }
+        }
+        if !prefix_allowed {
+            continue;
+        }
+
+        let mut prefix_allowed = true;
+        for prefix in &state.config.excluded_prefixes {
+            if file_name.starts_with(prefix) {
+                prefix_allowed = false;
+            }
+        }
+        if !prefix_allowed {
+            continue;
+        }
+
+        latest.push(LatestFileInfo {
+            file_name,
+            line_reviews,
+            comments: comments.0,
+            priority,
+        });
     }
     (StatusCode::CREATED, Json(LatestFileInfos(latest)))
 }
@@ -227,10 +256,10 @@ async fn handle_transform_review_state(
     State(state): State<AppState>,
     Json(payload): Json<Transform>,
 ) -> (StatusCode, Json<ReviewState>) {
-    let git = Git::new(&state.repo_path).unwrap();
-    let mut db = DB::new(state.db_path).unwrap();
+    let git = Git::new(&state.config.repository_path).unwrap();
+    let mut db = DB::new(state.config.db_path).unwrap();
     let file_name = payload.file_name;
-    let file_name = file_name.replace(&state.repo_path, "");
+    let file_name = file_name.replace(&state.config.repository_path, "");
     match transform_review_state(&file_name, &mut db, &git) {
         Ok(state) => {
             db.save().unwrap();
@@ -250,11 +279,11 @@ async fn handle_update_review_state(
     State(state): State<AppState>,
     Json(payload): Json<UpdateReviewState>,
 ) -> StatusCode {
-    let git = Git::new(&state.repo_path).unwrap();
+    let git = Git::new(&state.config.repository_path).unwrap();
     let mut payload = payload;
-    payload.file_name = payload.file_name.replace(&state.repo_path, "");
+    payload.file_name = payload.file_name.replace(&state.config.repository_path, "");
     let file_name = payload.file_name.clone();
-    let mut db = DB::new_single_file(state.db_path, &file_name).unwrap();
+    let mut db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
     match update_review_state(payload, &mut db, &git) {
         Ok(_) => {
             print!("Saving");
@@ -272,8 +301,8 @@ async fn handle_create_comment(
     State(state): State<AppState>,
     Json(payload): Json<CreateComment>,
 ) -> (StatusCode, Json<String>) {
-    let file_name = payload.file_name.replace(&state.repo_path, "");
-    let mut db = DB::new_single_file(state.db_path, &file_name).unwrap();
+    let file_name = payload.file_name.replace(&state.config.repository_path, "");
+    let mut db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
     match db.add_new_comment(
         file_name.clone(),
         payload.line_number,
@@ -315,8 +344,8 @@ async fn handle_delete_comment(
     State(state): State<AppState>,
     Json(payload): Json<DeleteComment>,
 ) -> StatusCode {
-    let file_name = payload.file_name.replace(&state.repo_path, "");
-    let mut db = DB::new_single_file(state.db_path, &file_name).unwrap();
+    let file_name = payload.file_name.replace(&state.config.repository_path, "");
+    let mut db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
     match db.delete_comment(file_name.clone(), payload.comment_id, payload.line_number) {
         Ok(_) => {
             db.save_file(&file_name).unwrap();
@@ -334,8 +363,8 @@ async fn handle_get_comments(
     Query(query): Query<HashMap<String, String>>,
 ) -> (StatusCode, Json<FileComments>) {
     let file_name = query.get(&"file_name".to_string()).unwrap();
-    let file_name = file_name.replace(&state.repo_path, "");
-    let db = DB::new_single_file(state.db_path, &file_name).unwrap();
+    let file_name = file_name.replace(&state.config.repository_path, "");
+    let db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
 
     match db.get_file_comments(&file_name) {
         Some(comments) => (StatusCode::CREATED, Json(comments)),
@@ -351,9 +380,9 @@ async fn handle_update_metadata(
     Json(payload): Json<UpdateMetadataRequest>,
 ) -> StatusCode {
     let mut payload = payload;
-    payload.file_name = payload.file_name.replace(&state.repo_path, "");
+    payload.file_name = payload.file_name.replace(&state.config.repository_path, "");
     let file_name = payload.file_name.clone();
-    let mut db = DB::new_single_file(state.db_path, &file_name).unwrap();
+    let mut db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
     match update_metadata(payload, &mut db) {
         Ok(_) => {
             print!("Saving");

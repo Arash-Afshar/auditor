@@ -1,0 +1,6 @@
+repository_path = "/path/to/repo"
+db_path = "/path/to/db"
+port = "3000"
+allowed_file_extensions = ".rs,.go"
+excluded_prefixes = "/path/1,/path/2"
+included_prefixes = "/path/3"
