@@ -34,7 +34,7 @@ struct LatestFileInfo {
     priority: Option<Priority>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppState {
     config: Config,
 }
@@ -130,6 +130,8 @@ async fn main() {
             .unwrap(),
     };
 
+    println!("{app_state:?}");
+
     let cors = CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource
         .allow_methods(vec![Method::GET, Method::POST])
@@ -209,19 +211,33 @@ async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json
     let mut latest = vec![];
     for (_, file_data) in db.file_dbs {
         let (file_name, line_reviews, comments, priority) = file_data.get_latest_info().unwrap();
-        // TODO: use exclusion list + allowed file extensions
-        if file_name.ends_with(".cpp")
-            || file_name.ends_with(".c")
-            || file_name.ends_with(".h")
-            || file_name.ends_with(".go")
-        {
-            latest.push(LatestFileInfo {
-                file_name,
-                line_reviews,
-                comments: comments.0,
-                priority,
-            });
+
+        let mut extension_allowed = false;
+        for ext in &state.config.allowed_file_extensions {
+            if file_name.ends_with(ext) {
+                extension_allowed = true;
+            }
         }
+        if !extension_allowed {
+            continue;
+        }
+
+        let mut prefix_allowed = true;
+        for prefix in &state.config.excluded_prefixes {
+            if file_name.starts_with(prefix) {
+                prefix_allowed = false;
+            }
+        }
+        if !prefix_allowed {
+            continue;
+        }
+
+        latest.push(LatestFileInfo {
+            file_name,
+            line_reviews,
+            comments: comments.0,
+            priority,
+        });
     }
     (StatusCode::CREATED, Json(LatestFileInfos(latest)))
 }
