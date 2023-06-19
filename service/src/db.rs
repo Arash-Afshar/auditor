@@ -2,6 +2,7 @@ use crate::{
     AuditorError, Comment, FileComments, Metadata, Priority, StoredReviewForCommit,
     StoredReviewForFile,
 };
+use anyhow::{Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -28,7 +29,7 @@ pub struct DBForFile {
 impl DBForFile {
     pub fn get_latest_info(
         &self,
-    ) -> Result<(String, StoredReviewForFile, FileComments, Option<Priority>), AuditorError> {
+    ) -> Result<(String, StoredReviewForFile, FileComments, Option<Priority>)> {
         Ok((
             self.file_name.clone(),
             self.commit_reviews
@@ -66,8 +67,8 @@ impl DBForFile {
 }
 
 impl DB {
-    pub fn new(db_dir: String) -> Result<Self, AuditorError> {
-        let paths = fs::read_dir(db_dir.clone())?;
+    pub fn new(db_dir: String) -> Result<Self> {
+        let paths = fs::read_dir(db_dir.clone()).context(format!("dir: {db_dir}"))?;
         let mut db = Self {
             db_dir,
             exclusions: vec![],
@@ -98,7 +99,7 @@ impl DB {
         Ok(db)
     }
 
-    pub fn new_single_file(db_dir: String, file_name: &String) -> Result<Self, AuditorError> {
+    pub fn new_single_file(db_dir: String, file_name: &String) -> Result<Self> {
         let mut db = Self {
             db_dir: db_dir.clone(),
             exclusions: vec![],
@@ -116,17 +117,17 @@ impl DB {
         Ok(db)
     }
 
-    pub fn save(&self) -> Result<(), AuditorError> {
+    pub fn save(&self) -> Result<()> {
         self.file_dbs
             .iter()
-            .try_for_each(|(file_name, _)| -> Result<(), AuditorError> {
+            .try_for_each(|(file_name, _)| -> Result<()> {
                 self.save_file(file_name)?;
                 Ok(())
             })?;
         Ok(())
     }
 
-    pub fn save_file(&self, file_name: &String) -> Result<(), AuditorError> {
+    pub fn save_file(&self, file_name: &String) -> Result<()> {
         let db_content = self
             .file_dbs
             .get(file_name)
@@ -138,7 +139,7 @@ impl DB {
         Ok(())
     }
 
-    fn stored_file_name(file_name: &String) -> Result<String, AuditorError> {
+    fn stored_file_name(file_name: &String) -> Result<String> {
         let mut s = DefaultHasher::new();
         file_name.hash(&mut s);
         let id_from_path = s.finish().to_string();
@@ -178,7 +179,7 @@ impl DB {
         &mut self,
         commit: &str,
         state: &StoredReviewForCommit,
-    ) -> Result<(), AuditorError> {
+    ) -> Result<()> {
         for file_name in state.files.keys() {
             let db_content = self
                 .file_dbs
@@ -205,7 +206,7 @@ impl DB {
         line_number: usize,
         body: String,
         author: String,
-    ) -> Result<String, AuditorError> {
+    ) -> Result<String> {
         let id = Uuid::new_v4().to_string();
         let comment = Comment {
             id: id.clone(),
@@ -226,7 +227,7 @@ impl DB {
         file_name: String,
         comment_id: String,
         line_number: usize,
-    ) -> Result<(), AuditorError> {
+    ) -> Result<()> {
         let current_comments = self
             .file_dbs
             .get_mut(&file_name)
@@ -258,7 +259,7 @@ impl DB {
             }
             Ok(())
         } else {
-            Err(AuditorError::UnknownCommentId(comment_id))
+            Err(AuditorError::UnknownCommentId(comment_id).into())
         }
     }
 
@@ -269,7 +270,7 @@ impl DB {
         line_number: usize,
         body: String,
         author: String,
-    ) -> Result<(), AuditorError> {
+    ) -> Result<()> {
         let current_comments = self
             .file_dbs
             .get_mut(&file_name)
@@ -289,7 +290,7 @@ impl DB {
                 return Ok(());
             }
         }
-        Err(AuditorError::UnknownCommentId(comment_id))
+        Err(AuditorError::UnknownCommentId(comment_id).into())
     }
 
     pub fn get_file_comments(&self, file_name: &String) -> Option<FileComments> {
@@ -298,11 +299,7 @@ impl DB {
             .map(|db_content| db_content.comments.clone())
     }
 
-    pub fn set_metadata(
-        &mut self,
-        file_name: &String,
-        metadata: Metadata,
-    ) -> Result<(), AuditorError> {
+    pub fn set_metadata(&mut self, file_name: &String, metadata: Metadata) -> Result<()> {
         let db_content = self
             .file_dbs
             .get_mut(file_name)
