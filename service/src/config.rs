@@ -26,6 +26,7 @@ pub struct ConfigBuilder {
     port: Option<String>,
     allowed_file_extensions: Option<String>,
     excluded_prefixes: Option<String>,
+    included_prefixes: Option<String>,
 }
 
 #[derive(Deserialize, Default, Clone, Debug)]
@@ -35,6 +36,7 @@ pub struct Config {
     pub port: String,
     pub allowed_file_extensions: Vec<String>,
     pub excluded_prefixes: Vec<String>,
+    pub included_prefixes: Vec<String>,
 }
 
 impl ConfigBuilder {
@@ -52,6 +54,7 @@ impl ConfigBuilder {
             update_from_toml!(self, c, port);
             update_from_toml!(self, c, allowed_file_extensions);
             update_from_toml!(self, c, excluded_prefixes);
+            update_from_toml!(self, c, included_prefixes);
         }
 
         Ok(self)
@@ -63,6 +66,7 @@ impl ConfigBuilder {
         update_from_env!(self, "PORT", port);
         update_from_env!(self, "ALLOWED_EXTENSIONS", allowed_file_extensions);
         update_from_env!(self, "EXCLUDED_PREFIXES", excluded_prefixes);
+        update_from_env!(self, "INCLUDED_PREFIXES", included_prefixes);
         Ok(self)
     }
 
@@ -90,6 +94,7 @@ impl ConfigBuilder {
                 .expect("Will never fail"),
             allowed_file_extensions: split(self.allowed_file_extensions.clone()),
             excluded_prefixes: split(self.excluded_prefixes.clone()),
+            included_prefixes: split(self.included_prefixes.clone()),
         })
     }
 }
@@ -107,6 +112,7 @@ db_path = "/path/to/db"
 port = "3000"
 allowed_file_extensions = ".rs,.go"
 excluded_prefixes = "/path/1,/path/2"
+included_prefixes = "/path/3"
         "#
             .to_string(),
         )
@@ -119,11 +125,13 @@ excluded_prefixes = "/path/1,/path/2"
             builder.excluded_prefixes,
             Some("/path/1,/path/2".to_string())
         );
+        assert_eq!(builder.included_prefixes, Some("/path/3".to_string()));
         let c = builder.build().unwrap();
         assert_eq!(c.repository_path, "/path/to/repo".to_string());
         assert_eq!(c.db_path, "/path/to/db".to_string());
         assert_eq!(c.port, "3000".to_string());
         assert_eq!(c.allowed_file_extensions, vec![".rs", ".go"]);
         assert_eq!(c.excluded_prefixes, vec!["/path/1", "/path/2"]);
+        assert_eq!(c.included_prefixes, vec!["/path/3"]);
     }
 }

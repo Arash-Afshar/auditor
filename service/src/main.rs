@@ -222,6 +222,16 @@ async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json
             continue;
         }
 
+        let mut prefix_allowed = false;
+        for prefix in &state.config.included_prefixes {
+            if file_name.starts_with(prefix) {
+                prefix_allowed = true;
+            }
+        }
+        if !prefix_allowed {
+            continue;
+        }
+
         let mut prefix_allowed = true;
         for prefix in &state.config.excluded_prefixes {
             if file_name.starts_with(prefix) {
