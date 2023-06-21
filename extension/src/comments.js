@@ -230,7 +230,7 @@ async function commentHandler(context, endpoint) {
     let activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
         const fileName = activeEditor.document.fileName;
-        if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+        if (auditingFiletypes.includes(activeEditor.document.languageId)) {
             if (!(fileName in initialized)) {
                 initialized[fileName] = true;
                 const comments = await getCommentsFromBackend(fileName);
@@ -242,7 +242,7 @@ async function commentHandler(context, endpoint) {
     vscode.window.onDidChangeActiveTextEditor(async (event) => {
         if (event != undefined) {
             const fileName = event.document.fileName;
-            if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+            if (auditingFiletypes.includes(event.document.languageId)) {
                 if (!(fileName in initialized)) {
                     initialized[fileName] = true;
                     const comments = await getCommentsFromBackend(fileName);

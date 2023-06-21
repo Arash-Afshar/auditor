@@ -186,7 +186,7 @@ function linereviewHandler(baseEndpoint) {
     vscode.window.onDidChangeActiveTextEditor(async (event) => {
         if (event != undefined) {
             const fileName = event.document.fileName;
-            if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+            if (auditingFiletypes.includes(event.document.languageId)) {
                 const state = await getReviewState(fileName);
                 showReviewState(state);
             }
@@ -197,7 +197,7 @@ function linereviewHandler(baseEndpoint) {
     let activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
         const fileName = activeEditor.document.fileName;
-        if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+        if (auditingFiletypes.includes(activeEditor.document.languageId)) {
             getReviewState(fileName).then((state) => {
                 showReviewState(state);
             });
