@@ -13,6 +13,8 @@ const newNoteComment = (id, body, mode, author, parent, contextValue) => {
 }
 
 async function commentHandler(context, endpoint) {
+    const auditingFiletypes = vscode.workspace.getConfiguration().get('auditor.auditingFiletypes');
+
     endpoint += 'comments';
     const commentController = vscode.comments.createCommentController(
         "audit.comment-controller",
@@ -23,8 +25,9 @@ async function commentHandler(context, endpoint) {
     // A `CommentingRangeProvider` controls where gutter decorations that allow adding comments are shown
     commentController.commentingRangeProvider = {
         provideCommentingRanges: (document) => {
-            const lineCount = document.lineCount;
-            return [new vscode.Range(0, 0, lineCount - 1, 0)];
+            if (auditingFiletypes.includes(document.languageId)) {
+                return [new vscode.Range(0, 0, document.lineCount - 1, 0)];
+            }
         },
     };
 
@@ -227,7 +230,7 @@ async function commentHandler(context, endpoint) {
     let activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
         const fileName = activeEditor.document.fileName;
-        if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+        if (auditingFiletypes.includes(activeEditor.document.languageId)) {
             if (!(fileName in initialized)) {
                 initialized[fileName] = true;
                 const comments = await getCommentsFromBackend(fileName);
@@ -239,7 +242,7 @@ async function commentHandler(context, endpoint) {
     vscode.window.onDidChangeActiveTextEditor(async (event) => {
         if (event != undefined) {
             const fileName = event.document.fileName;
-            if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+            if (auditingFiletypes.includes(event.document.languageId)) {
                 if (!(fileName in initialized)) {
                     initialized[fileName] = true;
                     const comments = await getCommentsFromBackend(fileName);

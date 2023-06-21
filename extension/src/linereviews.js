@@ -3,6 +3,7 @@ const vscode = require("vscode");
 const fetch = require("node-fetch");
 
 function linereviewHandler(baseEndpoint) {
+    const auditingFiletypes = vscode.workspace.getConfiguration().get('auditor.auditingFiletypes');
     const reviewEndpoint = baseEndpoint + 'reviews';
     const transformReviewEndpoint = baseEndpoint + 'transform';
 
@@ -79,6 +80,9 @@ function linereviewHandler(baseEndpoint) {
 
     const showReviewState = ({ reviewed, modified, ignored }) => {
         let activeEditor = vscode.window.activeTextEditor;
+        if (!auditingFiletypes.includes(vscode.window.activeTextEditor.document.languageId)) {
+            return
+        }
 
         let _reviewed = new Set();
         let _modified = new Set();
@@ -182,7 +186,7 @@ function linereviewHandler(baseEndpoint) {
     vscode.window.onDidChangeActiveTextEditor(async (event) => {
         if (event != undefined) {
             const fileName = event.document.fileName;
-            if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+            if (auditingFiletypes.includes(event.document.languageId)) {
                 const state = await getReviewState(fileName);
                 showReviewState(state);
             }
@@ -193,7 +197,7 @@ function linereviewHandler(baseEndpoint) {
     let activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
         const fileName = activeEditor.document.fileName;
-        if (fileName.endsWith("cpp") || fileName.endsWith("h") || fileName.endsWith("go")) {
+        if (auditingFiletypes.includes(activeEditor.document.languageId)) {
             getReviewState(fileName).then((state) => {
                 showReviewState(state);
             });
