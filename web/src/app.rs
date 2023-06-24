@@ -45,7 +45,7 @@ fn CaretDown(cx: Scope) -> impl IntoView {
 #[component]
 fn AccordionButton<F1, F2>(
     cx: Scope,
-    file_name: String,
+    full_file_name: String,
     line_info: StoredReviewForFile,
     has_comments: bool,
     priority: Option<Priority>,
@@ -57,20 +57,14 @@ where
     F1: Fn() -> bool,
     F2: Fn(MouseEvent) + 'static,
 {
-    let truncate = |name: String| {
-        let limit = 20;
-        if name.len() <= limit {
-            name
-        } else {
-            format!("...{}", name[name.len() - limit..].to_string())
-        }
-    };
+    let file_name: Vec<&str> = full_file_name.split("/").collect();
+    let file_name = file_name.last().unwrap().to_string();
 
     view! {
         cx,
         <div class="flex flex-row gap-5  border border-gray-200 dark:border-gray-700" class=("rounded-t-xl", move || is_first)>
             <div class="ml-5 flex flex-grow items-center gap-5 text-left text-gray-500 dark:text-gray-400 font-medium">
-                <div class="min-w-[100px]">{truncate(file_name)}</div>
+                <div class="min-w-[100px]">{file_name}</div>
                 <div class="flex-grow"></div>
                 {
                     match priority {
@@ -138,6 +132,7 @@ where
 {
     let id = format!("heading-{}", &file_name);
     let file_name_clone = file_name.clone();
+    let file_name_clone_2 = file_name.clone();
     let expanded = Signal::derive(cx, move || expanded().contains(&file_name_clone));
 
     let has_comments = !file_info.comments.is_empty();
@@ -146,9 +141,12 @@ where
         if file_info.comments.is_empty() {
             view! {
                 cx,
-                 <p class="text-gray-500 dark:text-gray-400">
-                  "No comments!"
-                 </p>
+                 <div class="text-gray-500 dark:text-gray-400">
+                    <p>
+                     "No comments!"
+                    </p>
+                    <p class="text-left">{format!("full path: {}", &file_name_clone_2)}</p>
+                 </div>
             }
             .into_view(cx)
         } else {
@@ -179,8 +177,9 @@ where
                 .collect_view(cx);
             view! {
                 cx,
-                <div class="flex flex-col gap-3 text-gray-500 dark:text-gray-400">
+                <div class="flex flex-col gap-3 text-gray-500 dark:text-gray-400 text-left">
                     {contents}
+                    <p>{format!("full path: {}", &file_name_clone_2)}</p>
                 </div>
             }
             .into_view(cx)
@@ -190,7 +189,7 @@ where
     view! {
         cx,
         <div id>
-            <AccordionButton file_name={file_name.clone()} line_info={file_info.line_reviews} has_comments priority is_first expanded on_click/>
+            <AccordionButton full_file_name={file_name.clone()} line_info={file_info.line_reviews} has_comments priority is_first expanded on_click/>
         </div>
         <div class=("hidden", move || !expanded()) aria-labelledby={id}>
             <div class="p-5 border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
@@ -347,7 +346,9 @@ fn Home(cx: Scope) -> impl IntoView {
                     return false;
                 }
                 if !search().is_empty() {
-                    return info.file_name.contains(&search());
+                    if !info.file_name.contains(&search()) {
+                        return false;
+                    }
                 }
                 if info.line_reviews.percent_ignored() == 100 {
                     return false;
@@ -356,14 +357,21 @@ fn Home(cx: Scope) -> impl IntoView {
                 if filters().only_with_comments && info.comments.is_empty() {
                     return false;
                 }
-                if filters().only_c_files
+                if filters().only_c_files && filters().only_go_files {
+                    if !(file_name.ends_with(".c")
+                        || file_name.ends_with(".cpp")
+                        || file_name.ends_with(".h")
+                        || file_name.ends_with(".go"))
+                    {
+                        return false;
+                    }
+                } else if filters().only_c_files
                     && !(file_name.ends_with(".c")
                         || file_name.ends_with(".cpp")
                         || file_name.ends_with(".h"))
                 {
                     return false;
-                }
-                if filters().only_go_files && !file_name.ends_with(".go") {
+                } else if filters().only_go_files && !file_name.ends_with(".go") {
                     return false;
                 }
                 true
