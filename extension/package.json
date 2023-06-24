@@ -191,7 +191,9 @@
       "properties": {
         "auditor.auditingFiletypes": {
           "type": "array",
-          "default": ["go"],
+          "default": [
+            "go"
+          ],
           "description": "Only the codes in the listed filetypes will be colored and commented"
         }
       }

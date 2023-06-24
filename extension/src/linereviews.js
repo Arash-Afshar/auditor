@@ -9,17 +9,32 @@ function linereviewHandler(baseEndpoint) {
 
     const ignoredLineDecorationType =
         vscode.window.createTextEditorDecorationType({
-            backgroundColor: { id: "auditor.ignoredBackground" },
+            overviewRulerColor: { id: "auditor.ignoredBackground" },
+            before: {
+                backgroundColor: { id: "auditor.ignoredBackground" },
+                color: { id: "auditor.ignoredBackground" },
+                contentText: "I"
+            },
         });
 
     const reviewedLineDecorationType =
         vscode.window.createTextEditorDecorationType({
-            backgroundColor: { id: "auditor.reviewedBackground" },
+            overviewRulerColor: { id: "auditor.reviewedBackground" },
+            before: {
+                backgroundColor: { id: "auditor.reviewedBackground" },
+                color: { id: "auditor.reviewedBackground" },
+                contentText: "R"
+            },
         });
 
     const modifiedLineDecorationType =
         vscode.window.createTextEditorDecorationType({
-            backgroundColor: { id: "auditor.modifiedBackground" },
+            overviewRulerColor: { id: "auditor.modifiedBackground" },
+            before: {
+                backgroundColor: { id: "auditor.modifiedBackground" },
+                color: { id: "auditor.modifiedBackground" },
+                contentText: "M"
+            },
         });
 
     const getReviewState = async (fileName) => {
