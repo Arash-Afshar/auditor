@@ -107,7 +107,7 @@ async function commentHandler(context, endpoint) {
 
     async function replyNote(reply) {
         const thread = reply.thread;
-        const author = "Arash";
+        const author = vscode.workspace.getConfiguration().get('auditor.commenterName');
         let fileName = thread.uri.path;
         let lineNumber = reply.thread.range.start.line;
         let comment_id = await createCommentInBackend(fileName, lineNumber, reply.text, author);

@@ -39,14 +39,16 @@
 
 ## Customize the extension colors
 
-Modify the `settings.json` file and add the following:
+Modify the `settings.json` (either at user or workspace level) file and add the following:
 
 ```
   "workbench.colorCustomizations": {
     "auditor.reviewedBackground":"#FFF00055",
     "auditor.modifiedBackground": "#FF000055",
     "auditor.ignoredBackground": "#D3D3D3F0"
-  }
+  },
+  "auditor.auditingFiletypes": ["c", "cpp", "go"],
+  "auditor.commenterName": "my name"
 ```
 
 ## Mark lines
