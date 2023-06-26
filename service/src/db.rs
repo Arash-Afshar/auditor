@@ -319,8 +319,8 @@ mod tests {
     fn test_read_write_scenarios() {
         let path = ".".to_string();
         let commit = "commit1".to_string();
-        let file1 = "file1".to_string();
-        let file2 = "file2".to_string();
+        let file1 = "file1.cpp".to_string();
+        let file2 = "file2.cpp".to_string();
         let mut file_reviews = HashMap::default();
         file_reviews.insert(
             file1.clone(),

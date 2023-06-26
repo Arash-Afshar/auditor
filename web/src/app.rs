@@ -47,7 +47,7 @@ fn AccordionButton<F1, F2>(
     cx: Scope,
     full_file_name: String,
     line_info: StoredReviewForFile,
-    has_comments: bool,
+    comments_count: usize,
     priority: Option<Priority>,
     is_first: bool,
     expanded: F1,
@@ -78,7 +78,7 @@ where
                     }
                 }
 
-                <div class="text-blue-500 min-w-[40px]">{if has_comments {"yes"} else {"no"}}</div>
+                <div class="text-blue-500 min-w-[40px]">{format!("({comments_count})")}</div>
                 <div class="text-green-500 min-w-[40px]">{line_info.percent_reviewed()}<span class="font-thin text-xs">" %"</span></div>
                 <div class="text-red-600 min-w-[40px]">{line_info.percent_modified()}<span class="font-thin text-xs">" %"</span></div>
                 <div class="text-gray-400 min-w-[40px]">{line_info.percent_ignored()}<span class="font-thin text-xs">" %"</span></div>
@@ -135,7 +135,7 @@ where
     let file_name_clone_2 = file_name.clone();
     let expanded = Signal::derive(cx, move || expanded().contains(&file_name_clone));
 
-    let has_comments = !file_info.comments.is_empty();
+    let comments_count = file_info.comments.len();
     let priority = file_info.priority;
     let display = move || {
         if file_info.comments.is_empty() {
@@ -189,7 +189,7 @@ where
     view! {
         cx,
         <div id>
-            <AccordionButton full_file_name={file_name.clone()} line_info={file_info.line_reviews} has_comments priority is_first expanded on_click/>
+            <AccordionButton full_file_name={file_name.clone()} line_info={file_info.line_reviews} comments_count priority is_first expanded on_click/>
         </div>
         <div class=("hidden", move || !expanded()) aria-labelledby={id}>
             <div class="p-5 border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
