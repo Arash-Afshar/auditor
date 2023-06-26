@@ -172,18 +172,8 @@ impl StoredReviewForFile {
             } else if new_start > *range.end() + 1 {
                 updated_ranges.push(range);
             } else {
-                let start = if *range.start() < new_start {
-                    *range.start()
-                } else {
-                    new_start
-                };
-                let end = if *range.end() > new_end {
-                    *range.end()
-                } else {
-                    new_end
-                };
-                new_start = start;
-                new_end = end;
+                new_start = std::cmp::min(*range.start(), new_start);
+                new_end = std::cmp::max(*range.end(), new_end);
             }
         }
         if !is_added {
