@@ -18,6 +18,13 @@ impl Git {
         Ok(commit.id().to_string())
     }
 
+    pub fn is_commit_older_than_latest(&self, commit: &String) -> Result<bool> {
+        let commit = Oid::from_str(&commit)?;
+        let commit = self.repo.find_commit(commit)?;
+        let latest_commit = self.repo.head()?.peel_to_commit()?;
+        Ok(commit.time().seconds() < latest_commit.time().seconds())
+    }
+
     pub fn get_tree_from_commit(&self, commit: &str) -> Result<Tree> {
         let commit = Oid::from_str(commit)?;
         let commit = self.repo.find_commit(commit)?;

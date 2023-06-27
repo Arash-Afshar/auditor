@@ -9,6 +9,9 @@ pub enum AuditorError {
     #[error("Comment id is not found")]
     UnknownCommentId(String),
 
+    #[error("Commit is older than the latest commit")]
+    OldCommitError(String),
+
     #[error("Commit not found in the db")]
     UnknownCommit(String),
 
