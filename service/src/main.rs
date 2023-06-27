@@ -194,7 +194,8 @@ async fn handle_get_review_state(
         .replace(&state.config.repository_path, "");
     let file_name = file_name.replace(&state.config.repository_path, "");
     let db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
-    match get_review_state(&file_name, &db) {
+    let git = Git::new(&state.config.repository_path).unwrap();
+    match get_review_state(&file_name, &db, &git) {
         Ok(state) => (StatusCode::CREATED, Json(state.into())),
         Err(err) => {
             tracing::error!("{}", err);

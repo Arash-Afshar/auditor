@@ -207,13 +207,20 @@ impl StoredReviewForFile {
     }
 }
 
-pub fn get_review_state(file_name: &String, db: &DB) -> Result<StoredReviewForFile> {
+pub fn get_review_state(file_name: &String, db: &DB, git: &Git) -> Result<StoredReviewForFile> {
     let commit = db.latest_reviewed_commit(file_name);
-    let state = db.review_status_of_commit(&commit);
-    Ok(match state.files.get(file_name) {
-        Some(state) => state.clone(),
-        None => StoredReviewForFile::default(),
-    })
+    if let Some(commit) = commit {
+        if git.is_commit_older_than_latest(&commit)? {
+            return Err(AuditorError::OldCommitError(commit.to_string()).into());
+        }
+        let state = db.review_status_of_commit(&Some(commit));
+        Ok(match state.files.get(file_name) {
+            Some(state) => state.clone(),
+            None => StoredReviewForFile::default(),
+        })
+    } else {
+        Ok(StoredReviewForFile::default())
+    }
 }
 
 pub fn transform_review_state(
@@ -222,6 +229,11 @@ pub fn transform_review_state(
     git: &Git,
 ) -> Result<StoredReviewForFile> {
     let commit = db.latest_reviewed_commit(file_name);
+    if let Some(commit) = &commit {
+        if git.is_commit_older_than_latest(commit)? {
+            return Err(AuditorError::OldCommitError(commit.to_string()).into());
+        }
+    }
     let mut state = db.review_status_of_commit(&commit);
     let diff = git.diff_current_and_commit(commit, (state.exclusions).as_ref())?;
     if diff.is_some() {
@@ -236,6 +248,11 @@ pub fn transform_review_state(
 
 pub fn update_review_state(changes: UpdateReviewState, db: &mut DB, git: &Git) -> Result<()> {
     let commit = db.latest_reviewed_commit(&changes.file_name);
+    if let Some(commit) = &commit {
+        if git.is_commit_older_than_latest(commit)? {
+            return Err(AuditorError::OldCommitError(commit.to_string()).into());
+        }
+    }
     let state = db.review_status_of_commit(&commit);
     let new_state = update_reviews(&state, changes);
     db.store_review_status(&git.current_commit()?, &new_state)?;
