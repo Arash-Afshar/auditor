@@ -230,8 +230,10 @@ pub fn transform_review_state(
 ) -> Result<StoredReviewForFile> {
     let commit = db.latest_reviewed_commit(file_name);
     if let Some(commit) = &commit {
-        if git.is_commit_older_than_latest(commit)? {
-            return Err(AuditorError::OldCommitError(commit.to_string()).into());
+        let same_commit = commit == &git.current_commit()?;
+        let older_commit = git.is_commit_older_than_latest(commit)?;
+        if !(same_commit || older_commit) {
+            return Err(AuditorError::ShouldUpdateToLatest(commit.to_string()).into());
         }
     }
     let mut state = db.review_status_of_commit(&commit);

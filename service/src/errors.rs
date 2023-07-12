@@ -12,6 +12,9 @@ pub enum AuditorError {
     #[error("Commit is older than the latest commit")]
     OldCommitError(String),
 
+    #[error("Commit in db is newer than the latest commit")]
+    ShouldUpdateToLatest(String),
+
     #[error("Commit not found in the db")]
     UnknownCommit(String),
 
