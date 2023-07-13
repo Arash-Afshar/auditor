@@ -131,6 +131,7 @@ async fn main() {
     };
 
     println!("{app_state:?}");
+    let port: u16 = app_state.config.port.clone().parse().unwrap();
 
     let cors = CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource
@@ -169,7 +170,7 @@ async fn main() {
                 ),
         );
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     tracing::debug!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
