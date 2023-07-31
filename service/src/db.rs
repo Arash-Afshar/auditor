@@ -1,5 +1,5 @@
 use crate::{
-    AuditorError, Comment, FileComments, Metadata, Priority, StoredReviewForCommit,
+    AuditorError, Comment, FileComments, Metadata, StoredReviewForCommit,
     StoredReviewForFile,
 };
 use anyhow::{Context, Result};
@@ -29,7 +29,7 @@ pub struct DBForFile {
 impl DBForFile {
     pub fn get_latest_info(
         &self,
-    ) -> Result<(String, StoredReviewForFile, FileComments, Option<Priority>)> {
+    ) -> Result<(String, StoredReviewForFile, FileComments, Option<Metadata>)> {
         Ok((
             self.file_name.clone(),
             self.commit_reviews
@@ -39,7 +39,7 @@ impl DBForFile {
                 ))?
                 .clone(),
             self.comments.clone(),
-            self.metadata.as_ref().map(|m| m.priority.clone()),
+            self.metadata.clone(),
         ))
     }
 }

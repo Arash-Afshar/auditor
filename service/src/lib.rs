@@ -21,6 +21,7 @@ pub struct FileComments(pub HashMap<usize, Vec<Comment>>);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Priority {
+    Unspecified,
     High,
     Medium,
     Low,
@@ -30,6 +31,8 @@ pub enum Priority {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Metadata {
     priority: Priority,
+    reviewer: String,
+    note: String,
 }
 
 #[derive(Deserialize, Debug)]

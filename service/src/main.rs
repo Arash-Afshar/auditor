@@ -3,15 +3,16 @@ use auditor::{
     db::DB,
     get_review_state,
     git::Git,
-    transform_review_state, update_metadata, update_review_state, Comment, FileComments, Priority,
+    transform_review_state, update_metadata, update_review_state, Comment, FileComments, Metadata,
     StoredReviewForFile, UpdateMetadataRequest, UpdateReviewState,
 };
 use axum::{
     extract::{Query, State},
     http::{Request, StatusCode},
-    routing::{delete, get, post},
+    routing::{delete, get, options, post},
     Json, Router,
 };
+use axum::http;
 use hyper::Method;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
@@ -23,15 +24,15 @@ use tower_http::{
 use tracing::{info_span, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct LatestFileInfos(Vec<LatestFileInfo>);
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct LatestFileInfo {
     file_name: String,
     line_reviews: StoredReviewForFile,
     comments: HashMap<usize, Vec<Comment>>,
-    priority: Option<Priority>,
+    metadata: Option<Metadata>,
 }
 
 #[derive(Clone, Debug)]
@@ -134,8 +135,9 @@ async fn main() {
     let port: u16 = app_state.config.port.clone().parse().unwrap();
 
     let cors = CorsLayer::new()
+        .allow_headers(vec![http::header::CONTENT_TYPE])
         // allow `GET` and `POST` when accessing the resource
-        .allow_methods(vec![Method::GET, Method::POST])
+        .allow_methods(vec![Method::GET, Method::POST, Method::OPTIONS])
         // allow requests from any origin
         .allow_origin(Any);
 
@@ -212,7 +214,7 @@ async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json
     let db = DB::new(state.config.db_path).unwrap();
     let mut latest = vec![];
     for (_, file_data) in db.file_dbs {
-        let (file_name, line_reviews, comments, priority) = file_data.get_latest_info().unwrap();
+        let (file_name, line_reviews, comments, metadata) = file_data.get_latest_info().unwrap();
 
         let mut extension_allowed = false;
         for ext in &state.config.allowed_file_extensions {
@@ -248,7 +250,7 @@ async fn handle_get_all_info(State(state): State<AppState>) -> (StatusCode, Json
             file_name,
             line_reviews,
             comments: comments.0,
-            priority,
+            metadata,
         });
     }
     (StatusCode::CREATED, Json(LatestFileInfos(latest)))
@@ -382,6 +384,7 @@ async fn handle_update_metadata(
     Json(payload): Json<UpdateMetadataRequest>,
 ) -> StatusCode {
     let mut payload = payload;
+    println!("updating metadata for {:?} with\n {:?}", payload.file_name, payload.metadata);
     payload.file_name = payload.file_name.replace(&state.config.repository_path, "");
     let file_name = payload.file_name.clone();
     let mut db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
