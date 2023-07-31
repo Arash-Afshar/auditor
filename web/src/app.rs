@@ -1,7 +1,14 @@
 use std::collections::HashSet;
 
-use crate::{Filters, LatestFileInfo, LatestFileInfos, Priority, StoredReviewForFile};
-use leptos::{ev::MouseEvent, *};
+use crate::{
+    Filters, LatestFileInfo, LatestFileInfos, Metadata, Priority, PriorityBF, StoredReviewForFile,
+    UpdateMetadataRequest,
+};
+use leptos::html::{Input, Select};
+use leptos::{
+    ev::{MouseEvent, SubmitEvent},
+    *,
+};
 // use leptos_meta::*;
 // use leptos_router::*;
 
@@ -48,7 +55,7 @@ fn AccordionButton<F1, F2>(
     full_file_name: String,
     line_info: StoredReviewForFile,
     comments_count: usize,
-    priority: Option<Priority>,
+    metadata: Option<Metadata>,
     is_first: bool,
     expanded: F1,
     on_click: F2,
@@ -59,24 +66,28 @@ where
 {
     let file_name: Vec<&str> = full_file_name.split("/").collect();
     let file_name = file_name.last().unwrap().to_string();
+    let note = metadata.clone().map(|m| m.note).unwrap_or("".to_string());
 
     view! {
         cx,
         <div class="flex flex-row gap-5  border border-gray-200 dark:border-gray-700" class=("rounded-t-xl", move || is_first)>
-            <div class="ml-5 flex flex-grow items-center gap-5 text-left text-gray-500 dark:text-gray-400 font-medium">
-                <div class="min-w-[100px]">{file_name}</div>
-                <div class="flex-grow"></div>
+            <div class="ml-5 flex flex-grow items-center gap-5 text-left text-gray-500 dark:text-gray-400 font-medium"  >
+                <div class="min-w-[70px]"></div>
                 {
-                    match priority {
-                        Some(priority) => match priority {
-                            Priority::High => view!{cx, <div class="text-red-400 min-w-[40px]">"High"</div>},
-                            Priority::Medium => view!{cx, <div class="text-green-600 min-w-[40px]">"Medium"</div>},
-                            Priority::Low => view!{cx, <div class="text-gray-500 min-w-[40px]">"Low"</div>},
-                            Priority::Ignore => view!{cx, <div class="text-gray-600 min-w-[40px]">"Ignored"</div>},
+                    match metadata {
+                        Some(metadata) => match metadata.priority {
+                            Priority::Unspecified => view!{cx, <div class="text-blue-600 min-w-[40px]">{metadata.reviewer}</div>},
+                            Priority::High => view!{cx, <div class="text-red-600 min-w-[40px]">{metadata.reviewer}</div>},
+                            Priority::Medium => view!{cx, <div class="text-yellow-400 min-w-[40px]">{metadata.reviewer}</div>},
+                            Priority::Low => view!{cx, <div class="text-green-500 min-w-[40px]">{metadata.reviewer}</div>},
+                            Priority::Ignore => view!{cx, <div class="text-gray-600 min-w-[40px]">{metadata.reviewer}</div>},
                         },
-                        None => view!{cx, <div></div>}
+                        None => view!{cx, <div>"no metadata!"</div>}
                     }
                 }
+                <div class="min-w-[120px]">{file_name}</div>
+
+                <div class="flex-grow text-black">{note}</div>
 
                 <div class="text-blue-500 min-w-[40px]">{format!("({comments_count})")}</div>
                 <div class="text-green-500 min-w-[40px]">{line_info.percent_reviewed()}<span class="font-thin text-xs">" %"</span></div>
@@ -118,6 +129,106 @@ fn SearchBar(cx: Scope, search: RwSignal<String>) -> impl IntoView {
     }
 }
 
+async fn update_metadata(update_metadata_request: &UpdateMetadataRequest) -> String {
+    let client = reqwest::Client::new();
+    match client
+        .post("http://localhost:3000/metadata")
+        .json(update_metadata_request)
+        .send()
+        .await
+    // Below handling are useless for now.
+    {
+        Ok(response) => {
+            println!("response: {:?}", response);
+            "yes!".to_string()
+        }
+        Err(e) => {
+            println!("error: {:?}", e);
+            "nope".to_string()
+        }
+    }
+}
+
+#[component]
+fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) -> impl IntoView {
+    let (_metadata_updater, set_metadata_updater) = create_signal(
+        cx,
+        create_resource(cx, || (), |_| async move { "".to_string() }),
+    );
+
+    // we'll use a NodeRefs to store references to the input elements
+    // these will be filled when the elements are created
+    let note_element: NodeRef<Input> = create_node_ref(cx);
+    let priority_element: NodeRef<Select> = create_node_ref(cx);
+    let reviewer_element: NodeRef<Select> = create_node_ref(cx);
+
+    let reviewer = metadata.unwrap().reviewer;
+
+    let on_submit = move |ev: SubmitEvent| {
+        // stop the page from reloading!
+        ev.prevent_default();
+
+        let note = note_element().expect("<input> to exist").value();
+        let priority_str = priority_element().expect("<select> to exist").value();
+        // let reviewer = reviewer_element().expect("<select> to exist").value();
+        let reviewer = reviewer.clone();
+
+        let request = UpdateMetadataRequest {
+            file_name: full_file_name.clone(),
+            metadata: Metadata {
+                priority: priority_str.parse().unwrap(),
+                reviewer: reviewer, // TODO: unchanged reviewer for now
+                note: note,
+            },
+        };
+
+        set_metadata_updater.update(|_: &mut Resource<(), String>| {
+            let request = request.clone();
+            create_resource(
+                cx,
+                move || request.clone(),
+                |request| async move {
+                    update_metadata(&request).await;
+                },
+            );
+        });
+    };
+
+    view! { cx,
+        <form on:submit=on_submit>
+            <b>"Note: "</b>
+            <input type="text"
+                node_ref=note_element
+                placeholder="old note will be override"
+                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            />
+            <b>"　Priority: "</b>
+            <select id="priority" name="priority" node_ref=priority_element>
+                <option value="Unspecified">"Unspecified"</option>
+                <option value="Ignore">"Ignore"</option>
+                <option value="Low">"Low"</option>
+                <option value="Medium">"Medium"</option>
+                <option value="High">"High"</option>
+            </select>
+            <b>"　Reviewer: "</b>
+            <select id="reviewer" name="reviewer" node_ref=reviewer_element>
+                <option value="Unassigned">"Unassigned"</option>
+            </select>
+            <b>"　　"</b>
+            <input type="submit" value="Save" class="font-medium focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"/>
+        </form>
+        // Could be useful for showing the update status
+        // <p>
+        // <div class="m-5">
+        //     {move || match metadata_updater.try_get().unwrap().read(cx) {
+        //         None => view! { cx, <div></div> }.into_view(cx),
+        //         Some(_) => view! { cx, <div></div> }.into_view(cx)
+        //     }}
+        // </div>
+        // </p>
+    }
+}
+
 #[component]
 fn ExpandableComment<F>(
     cx: Scope,
@@ -136,17 +247,17 @@ where
     let expanded = Signal::derive(cx, move || expanded().contains(&file_name_clone));
 
     let comments_count = file_info.comments.len();
-    let priority = file_info.priority;
+    let metadata: Option<crate::Metadata> = file_info.metadata;
     let display = move || {
         if file_info.comments.is_empty() {
             view! {
                 cx,
-                 <div class="text-gray-500 dark:text-gray-400">
+                <div class="text-gray-500 dark:text-gray-400">
                     <p>
-                     "No comments!"
+                    "No comments!"
                     </p>
                     <p class="text-left">{format!("full path: {}", &file_name_clone_2)}</p>
-                 </div>
+                </div>
             }
             .into_view(cx)
         } else {
@@ -189,9 +300,12 @@ where
     view! {
         cx,
         <div id>
-            <AccordionButton full_file_name={file_name.clone()} line_info={file_info.line_reviews} comments_count priority is_first expanded on_click/>
+            <AccordionButton full_file_name={file_name.clone()} line_info={file_info.line_reviews} comments_count metadata=metadata.clone() is_first expanded on_click/>
         </div>
-        <div class=("hidden", move || !expanded()) aria-labelledby={id}>
+        <div class=("hidden", move || !expanded()) aria-labelledby={&id}>
+            <FileDetails full_file_name={file_name.clone()} metadata={metadata.clone()}/>
+        </div>
+        <div class=("hidden", move || !expanded()) aria-labelledby={&id}>
             <div class="p-5 border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
                 {display}
             </div>
@@ -254,10 +368,14 @@ fn FiltersView(cx: Scope, filters: RwSignal<Filters>) -> impl IntoView {
     let sort_by_reviewed = move || filters().sort_by_reviewed;
     let sort_by_name = move || filters().sort_by_name;
 
+    let filter_checkbox_class_str = "w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600";
+    let filter_label_class_str = "ml-2 text-sm font-medium dark:text-gray-300";
+
     view! {
         cx,
         <div class="flex flex-col gap-5 m-6 p-5 text-left dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg">
             <div class="flex flex-row gap-5">
+                <p><b>"By filetype"</b></p>
                 <div class="flex items-center">
                     <input checked={move || filters().only_with_comments} on:change=move |ev| filters.update(|f| f.only_with_comments = event_target_checked(&ev)) id="comments_only" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                     <label for="comments_only" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Comments"</label>
@@ -269,6 +387,36 @@ fn FiltersView(cx: Scope, filters: RwSignal<Filters>) -> impl IntoView {
                 <div class="flex items-center">
                     <input checked={move || filters().only_go_files} on:change=move |ev| filters.update(|f| f.only_go_files = event_target_checked(&ev)) id="go" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                     <label for="go" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Go"</label>
+                </div>
+            </div>
+            <div class="flex flex-row gap-5">
+                <p><b>"By reviewer"</b></p>
+                <div class="flex items-center">
+                    <input checked={move || filters().reviewer_unassigned} on:change=move |ev| filters.update(|f| f.reviewer_unassigned = event_target_checked(&ev)) id="unassigned" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="unassigned" class={filter_label_class_str}>"Unassigned"</label>
+                </div>
+            </div>
+            <div class="flex flex-row gap-5">
+                <p><b>"By priority"</b></p>
+                <div class="flex items-center">
+                    <input checked={move || filters().priority_mask.contains(PriorityBF::UNSPECIFIED)} on:change=move |ev| filters.update(|f| f.priority_mask.set(PriorityBF::UNSPECIFIED, event_target_checked(&ev))) id="prior_unspecified" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="prior_unspecified" class={filter_label_class_str.to_owned()+" text-blue-600"}>"Unspecified"</label>
+                </div>
+                <div class="flex items-center">
+                    <input checked={move || filters().priority_mask.contains(PriorityBF::HIGH)} on:change=move |ev| filters.update(|f| f.priority_mask.set(PriorityBF::HIGH, event_target_checked(&ev))) id="prior_high" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="prior_high" class={filter_label_class_str.to_owned()+" text-red-600"}>"High"</label>
+                </div>
+                <div class="flex items-center">
+                    <input checked={move || filters().priority_mask.contains(PriorityBF::MEDIUM)} on:change=move |ev| filters.update(|f| f.priority_mask.set(PriorityBF::MEDIUM, event_target_checked(&ev))) id="prior_medium" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="prior_medium" class={filter_label_class_str.to_owned()+" text-yellow-400"}>"Medium"</label>
+                </div>
+                <div class="flex items-center">
+                    <input checked={move || filters().priority_mask.contains(PriorityBF::LOW)} on:change=move |ev| filters.update(|f| f.priority_mask.set(PriorityBF::LOW, event_target_checked(&ev))) id="prior_low" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="prior_low" class={filter_label_class_str.to_owned()+" text-green-500"}>"Low"</label>
+                </div>
+                <div class="flex items-center">
+                    <input checked={move || filters().priority_mask.contains(PriorityBF::IGNORE)} on:change=move |ev| filters.update(|f| f.priority_mask.set(PriorityBF::IGNORE, event_target_checked(&ev))) id="prior_ignore" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="prior_ignore" class={filter_label_class_str.to_owned()+" text-gray-600"}>"Ignore"</label>
                 </div>
             </div>
             <div class="flex flex-row gap-5">
@@ -332,7 +480,7 @@ fn Home(cx: Scope) -> impl IntoView {
             let response = reqwest::get(request_url).await.unwrap();
 
             let all_info: LatestFileInfos = response.json().await.unwrap();
-            // let all_info = LatestFileInfos(HashMap::default());
+
             all_info
         },
     );
@@ -342,13 +490,31 @@ fn Home(cx: Scope) -> impl IntoView {
             .0
             .into_iter()
             .filter(|info| {
-                if let Some(Priority::Ignore) = &info.priority {
-                    return false;
-                }
                 if !search().is_empty() {
                     if !info.file_name.contains(&search()) {
                         return false;
                     }
+                }
+                if let Some(Metadata {
+                    priority,
+                    reviewer,
+                    note: _,
+                }) = &info.metadata
+                {
+                    let priority = match priority {
+                        Priority::Unspecified => PriorityBF::UNSPECIFIED,
+                        Priority::High => PriorityBF::HIGH,
+                        Priority::Medium => PriorityBF::MEDIUM,
+                        Priority::Low => PriorityBF::LOW,
+                        Priority::Ignore => PriorityBF::IGNORE,
+                    };
+                    if reviewer == "Unassigned" && !filters().reviewer_unassigned {
+                        return false;
+                    }
+                    if !filters().priority_mask.contains(priority) {
+                        return false;
+                    }
+                    return true;
                 }
                 if info.line_reviews.percent_ignored() == 100 {
                     return false;
