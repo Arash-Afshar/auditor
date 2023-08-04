@@ -9,7 +9,7 @@ use auditor::{
 use axum::{
     extract::{Query, State},
     http::{Request, StatusCode},
-    routing::{delete, get, options, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use axum::http;

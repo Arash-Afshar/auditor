@@ -21,3 +21,4 @@ console_error_panic_hook = { version = "0.1"}
 serde = { version = "1.0.164", features = ["derive"] }
 reqwest = { version = "0.11.18", features = ["json"] }
 
+bitflags = "1.2.1"

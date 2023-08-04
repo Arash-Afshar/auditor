@@ -1,10 +1,10 @@
-use std::{collections::HashMap, ops::RangeInclusive};
-
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, ops::RangeInclusive, str::FromStr};
+use bitflags::bitflags;
 
 pub mod app;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Comment {
     pub id: String,
     pub body: String,
@@ -16,7 +16,7 @@ pub struct StoredReviewForFile {
     pub reviewed: Vec<RangeInclusive<usize>>,
     pub modified: Vec<RangeInclusive<usize>>,
     pub ignored: Vec<RangeInclusive<usize>>,
-    total_lines: usize,
+    pub total_lines: usize,
 }
 
 impl StoredReviewForFile {
@@ -49,23 +49,64 @@ impl StoredReviewForFile {
         self.percent_helper(&self.ignored)
     }
 }
+
 #[derive(Serialize, Deserialize, Clone)]
 struct LatestFileInfos(Vec<LatestFileInfo>);
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Priority {
+    Unspecified,
     High,
     Medium,
     Low,
     Ignore,
 }
 
+bitflags! {
+    // Specify the name of your flag set and the underlying integer type
+    pub struct PriorityBF: u8 {
+        const UNSPECIFIED = 0b1;
+        const HIGH = 0b10;
+        const MEDIUM = 0b100;
+        const LOW = 0b1000;
+        const IGNORE = 0b10000;
+    }
+}
+
+impl FromStr for Priority {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Unspecified" => Ok(Priority::Unspecified),
+            "High" => Ok(Priority::High),
+            "Medium" => Ok(Priority::Medium),
+            "Low" => Ok(Priority::Low),
+            "Ignore" => Ok(Priority::Ignore),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Metadata {
+    priority: Priority,
+    reviewer: String,
+    note: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct UpdateMetadataRequest {
+    pub file_name: String,
+    pub metadata: Metadata,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
-pub struct LatestFileInfo {
+struct LatestFileInfo {
     file_name: String,
     line_reviews: StoredReviewForFile,
     comments: HashMap<usize, Vec<Comment>>,
-    priority: Option<Priority>,
+    metadata: Option<Metadata>,
 }
 
 #[derive(Clone, Debug)]
@@ -73,9 +114,19 @@ pub struct Filters {
     pub only_with_comments: bool,
     pub only_c_files: bool,
     pub only_go_files: bool,
+
     pub sort_by_modified: bool,
     pub sort_by_reviewed: bool,
     pub sort_by_name: bool,
+
+    pub reviewer_unassigned: bool,
+
+    pub priority_mask: PriorityBF,
+    pub priority_unspecified: bool,
+    pub priority_high: bool,
+    pub priority_medium: bool,
+    pub priority_low: bool,
+    pub priority_ignore: bool,
 }
 
 impl Default for Filters {
@@ -84,9 +135,19 @@ impl Default for Filters {
             only_with_comments: false,
             only_c_files: true,
             only_go_files: false,
+
             sort_by_modified: false,
             sort_by_reviewed: true,
             sort_by_name: false,
+
+            reviewer_unassigned: true,
+
+            priority_mask: PriorityBF::UNSPECIFIED | PriorityBF::HIGH | PriorityBF::MEDIUM | PriorityBF::LOW,
+            priority_unspecified: true,
+            priority_high: true,
+            priority_medium: true,
+            priority_low: true,
+            priority_ignore: false,
         }
     }
 }
