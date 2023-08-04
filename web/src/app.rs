@@ -136,25 +136,15 @@ async fn update_metadata(update_metadata_request: &UpdateMetadataRequest) -> Str
         .json(update_metadata_request)
         .send()
         .await
-    // Below handling are useless for now.
     {
-        Ok(response) => {
-            println!("response: {:?}", response);
-            "yes!".to_string()
-        }
-        Err(e) => {
-            println!("error: {:?}", e);
-            "nope".to_string()
-        }
+        Ok(response) => "Saved!".to_string(),
+        Err(e) => e.to_string(),
     }
 }
 
 #[component]
 fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) -> impl IntoView {
-    let (_metadata_updater, set_metadata_updater) = create_signal(
-        cx,
-        create_resource(cx, || (), |_| async move { "".to_string() }),
-    );
+    let reviewer = metadata.unwrap().reviewer;
 
     // we'll use a NodeRefs to store references to the input elements
     // these will be filled when the elements are created
@@ -162,11 +152,13 @@ fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) ->
     let priority_element: NodeRef<Select> = create_node_ref(cx);
     let reviewer_element: NodeRef<Select> = create_node_ref(cx);
 
-    let reviewer = metadata.unwrap().reviewer;
+    let update_metadata_action = create_action(cx, |request: &UpdateMetadataRequest| {
+        let request = request.to_owned();
+        async move { update_metadata(&request).await }
+    });
 
     let on_submit = move |ev: SubmitEvent| {
-        // stop the page from reloading!
-        ev.prevent_default();
+        ev.prevent_default(); // stop the page from reloading!
 
         let note = note_element().expect("<input> to exist").value();
         let priority_str = priority_element().expect("<select> to exist").value();
@@ -182,16 +174,7 @@ fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) ->
             },
         };
 
-        set_metadata_updater.update(|_: &mut Resource<(), String>| {
-            let request = request.clone();
-            create_resource(
-                cx,
-                move || request.clone(),
-                |request| async move {
-                    update_metadata(&request).await;
-                },
-            );
-        });
+        update_metadata_action.dispatch(request);
     };
 
     view! { cx,
@@ -216,6 +199,7 @@ fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) ->
             </select>
             <b>"　　"</b>
             <input type="submit" value="Save" class="font-medium focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"/>
+            "　"{update_metadata_action.value()}
         </form>
         // Could be useful for showing the update status
         // <p>
