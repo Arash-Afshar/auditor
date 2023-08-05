@@ -137,7 +137,7 @@ async fn update_metadata(update_metadata_request: &UpdateMetadataRequest) -> Str
         .send()
         .await
     {
-        Ok(response) => "Saved!".to_string(),
+        Ok(_response) => "Saved!".to_string(),
         Err(e) => e.to_string(),
     }
 }
@@ -177,6 +177,8 @@ fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) ->
         update_metadata_action.dispatch(request);
     };
 
+    let reviewers = ["Reviewer1", "Reviewer2"]; // Hardcore the list of reviewers here.
+
     view! { cx,
         <form on:submit=on_submit>
             <b>"Note: "</b>
@@ -196,6 +198,9 @@ fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) ->
             <b>"　Reviewer: "</b>
             <select id="reviewer" name="reviewer" node_ref=reviewer_element>
                 <option value="Unassigned">"Unassigned"</option>
+                {reviewers.into_iter()
+                    .map(|reviewer| view! { cx, <option value={reviewer}>{reviewer}</option>})
+                    .collect::<Vec<_>>()}
             </select>
             <b>"　　"</b>
             <input type="submit" value="Save" class="font-medium focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"/>
