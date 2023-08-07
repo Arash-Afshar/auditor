@@ -6,16 +6,16 @@ use auditor::{
     transform_review_state, update_metadata, update_review_state, Comment, FileComments, Metadata,
     StoredReviewForFile, UpdateMetadataRequest, UpdateReviewState,
 };
+use axum::http;
 use axum::{
     extract::{Query, State},
     http::{Request, StatusCode},
     routing::{delete, get, post},
     Json, Router,
 };
-use axum::http;
 use hyper::Method;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, env, net::SocketAddr, time::Duration};
 use tower_http::{
     classify::ServerErrorsFailureClass,
     cors::{Any, CorsLayer},
@@ -120,10 +120,16 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    let mut config_path = "./config.toml";
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 2 {
+        config_path = &args[1];
+    }
+
     let mut builder = ConfigBuilder::default();
     let app_state = AppState {
         config: builder
-            .toml("./config.toml")
+            .toml(config_path)
             .unwrap()
             .env()
             .unwrap()
@@ -384,7 +390,6 @@ async fn handle_update_metadata(
     Json(payload): Json<UpdateMetadataRequest>,
 ) -> StatusCode {
     let mut payload = payload;
-    println!("updating metadata for {:?} with\n {:?}", payload.file_name, payload.metadata);
     payload.file_name = payload.file_name.replace(&state.config.repository_path, "");
     let file_name = payload.file_name.clone();
     let mut db = DB::new_single_file(state.config.db_path, &file_name).unwrap();
