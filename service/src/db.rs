@@ -1,12 +1,12 @@
 use crate::{
-    AuditorError, Comment, FileComments, Metadata, StoredReviewForCommit,
-    StoredReviewForFile,
+    AuditorError, Comment, FileComments, Metadata, StoredReviewForCommit, StoredReviewForFile,
 };
 use anyhow::{Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::hash::{Hash, Hasher};
+use std::path::Path;
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     fs::File,
@@ -108,12 +108,14 @@ impl DB {
 
         let path = Self::stored_file_name(file_name)?;
         let path = format!("{db_dir}/{path}");
-        let mut file = File::open(path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        let deserialized: DBForFile = serde_json::from_str(&contents)?;
-        db.file_dbs
-            .insert(deserialized.file_name.clone(), deserialized);
+        if Path::new(&path).exists() {
+            let mut file = File::open(path)?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            let deserialized: DBForFile = serde_json::from_str(&contents)?;
+            db.file_dbs
+                .insert(deserialized.file_name.clone(), deserialized);
+        }
         Ok(db)
     }
 
