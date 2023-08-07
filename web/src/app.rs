@@ -137,13 +137,18 @@ async fn update_metadata(update_metadata_request: &UpdateMetadataRequest) -> Str
         .send()
         .await
     {
-        Ok(response) => "Saved!".to_string(),
+        Ok(_response) => "Saved!".to_string(),
         Err(e) => e.to_string(),
     }
 }
 
 #[component]
-fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) -> impl IntoView {
+fn FileDetails(
+    cx: Scope,
+    reviewers: Vec<String>,
+    full_file_name: String,
+    metadata: Option<Metadata>
+) -> impl IntoView {
     let reviewer = metadata.unwrap().reviewer;
 
     // we'll use a NodeRefs to store references to the input elements
@@ -177,6 +182,8 @@ fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) ->
         update_metadata_action.dispatch(request);
     };
 
+    // let reviewers = ["Yi-Hsiu", "Arash"]; // Hardcore the list of reviewers here.
+
     view! { cx,
         <form on:submit=on_submit>
             <b>"Note: "</b>
@@ -196,26 +203,21 @@ fn FileDetails(cx: Scope, full_file_name: String, metadata: Option<Metadata>) ->
             <b>"　Reviewer: "</b>
             <select id="reviewer" name="reviewer" node_ref=reviewer_element>
                 <option value="Unassigned">"Unassigned"</option>
+                {reviewers.into_iter()
+                    .map(|reviewer| view! { cx, <option value={&reviewer}>{reviewer}</option>})
+                    .collect::<Vec<_>>()}
             </select>
             <b>"　　"</b>
             <input type="submit" value="Save" class="font-medium focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"/>
             "　"{update_metadata_action.value()}
         </form>
-        // Could be useful for showing the update status
-        // <p>
-        // <div class="m-5">
-        //     {move || match metadata_updater.try_get().unwrap().read(cx) {
-        //         None => view! { cx, <div></div> }.into_view(cx),
-        //         Some(_) => view! { cx, <div></div> }.into_view(cx)
-        //     }}
-        // </div>
-        // </p>
     }
 }
 
 #[component]
 fn ExpandableComment<F>(
     cx: Scope,
+    reviewers: Vec<String>,
     file_name: String,
     file_info: LatestFileInfo,
     is_first: bool,
@@ -287,7 +289,7 @@ where
             <AccordionButton full_file_name={file_name.clone()} line_info={file_info.line_reviews} comments_count metadata=metadata.clone() is_first expanded on_click/>
         </div>
         <div class=("hidden", move || !expanded()) aria-labelledby={&id}>
-            <FileDetails full_file_name={file_name.clone()} metadata={metadata.clone()}/>
+            <FileDetails full_file_name={file_name.clone()} metadata={metadata.clone()} reviewers={reviewers.clone()}/>
         </div>
         <div class=("hidden", move || !expanded()) aria-labelledby={&id}>
             <div class="p-5 border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
@@ -298,7 +300,7 @@ where
 }
 
 #[component]
-fn Comments(cx: Scope, info: LatestFileInfos) -> impl IntoView {
+fn Comments(cx: Scope, info: LatestFileInfos, reviewers: Vec<String>) -> impl IntoView {
     // Contains the list of files that all are expanded
     let (expanded, set_expanded) = create_signal(cx, HashSet::<String>::default());
     if !info.0.is_empty() {
@@ -318,6 +320,7 @@ fn Comments(cx: Scope, info: LatestFileInfos) -> impl IntoView {
             view! {
                 cx,
                 <ExpandableComment
+                    reviewers={reviewers.clone()}
                     file_name={file_name.clone()}
                     file_info
                     is_first={idx==0}
@@ -465,7 +468,23 @@ fn Home(cx: Scope) -> impl IntoView {
 
             let all_info: LatestFileInfos = response.json().await.unwrap();
 
-            all_info
+            let reviewers: HashSet<_> = all_info
+                .0
+                .iter()
+                .map(|info: &LatestFileInfo| match &info.metadata {
+                    Some(Metadata {
+                        priority: _,
+                        reviewer,
+                        note: _,
+                    }) => reviewer.clone(),
+                    None => "Unassigned".to_string(),
+                })
+                .collect();
+
+            let mut reviewers: Vec<String> = reviewers.iter().cloned().collect();
+            reviewers.sort();
+
+            (all_info, reviewers)
         },
     );
 
@@ -557,7 +576,9 @@ fn Home(cx: Scope) -> impl IntoView {
                 <div class="m-5">
                     {move || match asyc_comments.read(cx) {
                         None => view! { cx, <p>"Loading..."</p> }.into_view(cx),
-                        Some(comments) => view! { cx, <Comments info={filter(comments)}/> }.into_view(cx)
+                        Some(resource) => view! {cx, <Comments
+                            info={filter(resource.0)}
+                            reviewers=resource.1/> }.into_view(cx)
                     }}
                 </div>
             </div>
