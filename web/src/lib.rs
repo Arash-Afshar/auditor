@@ -122,11 +122,6 @@ pub struct Filters {
     pub reviewer_unassigned: bool,
 
     pub priority_mask: PriorityBF,
-    pub priority_unspecified: bool,
-    pub priority_high: bool,
-    pub priority_medium: bool,
-    pub priority_low: bool,
-    pub priority_ignore: bool,
 }
 
 impl Default for Filters {
@@ -140,14 +135,9 @@ impl Default for Filters {
             sort_by_reviewed: true,
             sort_by_name: false,
 
-            reviewer_unassigned: true,
+            reviewer_unassigned: false,
 
             priority_mask: PriorityBF::UNSPECIFIED | PriorityBF::HIGH | PriorityBF::MEDIUM | PriorityBF::LOW,
-            priority_unspecified: true,
-            priority_high: true,
-            priority_medium: true,
-            priority_low: true,
-            priority_ignore: false,
         }
     }
 }

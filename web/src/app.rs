@@ -147,7 +147,7 @@ fn FileDetails(
     cx: Scope,
     reviewers: Vec<String>,
     full_file_name: String,
-    metadata: Option<Metadata>
+    metadata: Option<Metadata>,
 ) -> impl IntoView {
     let reviewer = metadata.unwrap().reviewer;
 
@@ -181,8 +181,6 @@ fn FileDetails(
 
         update_metadata_action.dispatch(request);
     };
-
-    // let reviewers = ["Yi-Hsiu", "Arash"]; // Hardcore the list of reviewers here.
 
     view! { cx,
         <form on:submit=on_submit>
@@ -511,7 +509,9 @@ fn Home(cx: Scope) -> impl IntoView {
                         Priority::Low => PriorityBF::LOW,
                         Priority::Ignore => PriorityBF::IGNORE,
                     };
-                    if reviewer == "Unassigned" && !filters().reviewer_unassigned {
+                    if (reviewer == "Unassigned" && !filters().reviewer_unassigned)
+                        || (reviewer != "Unassigned" && filters().reviewer_unassigned)
+                    {
                         return false;
                     }
                     if !filters().priority_mask.contains(priority) {
