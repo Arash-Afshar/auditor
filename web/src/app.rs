@@ -167,14 +167,13 @@ fn FileDetails(
 
         let note = note_element().expect("<input> to exist").value();
         let priority_str = priority_element().expect("<select> to exist").value();
-        // let reviewer = reviewer_element().expect("<select> to exist").value();
-        let reviewer = reviewer.clone();
+        let reviewer = reviewer_element().expect("<select> to exist").value();
 
         let request = UpdateMetadataRequest {
             file_name: full_file_name.clone(),
             metadata: Metadata {
                 priority: priority_str.parse().unwrap(),
-                reviewer: reviewer, // TODO: unchanged reviewer for now
+                reviewer: reviewer,
                 note: note,
             },
         };
