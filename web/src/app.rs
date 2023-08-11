@@ -149,8 +149,6 @@ fn FileDetails(
     full_file_name: String,
     metadata: Option<Metadata>,
 ) -> impl IntoView {
-    let reviewer = metadata.unwrap().reviewer;
-
     // we'll use a NodeRefs to store references to the input elements
     // these will be filled when the elements are created
     let note_element: NodeRef<Input> = create_node_ref(cx);
@@ -361,16 +359,16 @@ fn FiltersView(cx: Scope, filters: RwSignal<Filters>) -> impl IntoView {
             <div class="flex flex-row gap-5">
                 <p><b>"By filetype"</b></p>
                 <div class="flex items-center">
-                    <input checked={move || filters().only_with_comments} on:change=move |ev| filters.update(|f| f.only_with_comments = event_target_checked(&ev)) id="comments_only" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                    <label for="comments_only" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Comments"</label>
+                    <input checked={move || filters().only_with_comments} on:change=move |ev| filters.update(|f| f.only_with_comments = event_target_checked(&ev)) id="comments_only" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="comments_only" class={filter_label_class_str}>"Comments"</label>
                 </div>
                 <div class="flex items-center">
-                    <input checked={move || filters().only_c_files} on:change=move |ev| filters.update(|f| f.only_c_files = event_target_checked(&ev)) id="cpp" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                    <label for="cpp" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"C"</label>
+                    <input checked={move || filters().only_c_files} on:change=move |ev| filters.update(|f| f.only_c_files = event_target_checked(&ev)) id="cpp" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="cpp" class={filter_label_class_str}>"C/C++"</label>
                 </div>
                 <div class="flex items-center">
-                    <input checked={move || filters().only_go_files} on:change=move |ev| filters.update(|f| f.only_go_files = event_target_checked(&ev)) id="go" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                    <label for="go" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">"Go"</label>
+                    <input checked={move || filters().only_go_files} on:change=move |ev| filters.update(|f| f.only_go_files = event_target_checked(&ev)) id="go" type="checkbox" value="" class={filter_checkbox_class_str}/>
+                    <label for="go" class={filter_label_class_str}>"Go"</label>
                 </div>
             </div>
             <div class="flex flex-row gap-5">
@@ -516,7 +514,6 @@ fn Home(cx: Scope) -> impl IntoView {
                     if !filters().priority_mask.contains(priority) {
                         return false;
                     }
-                    return true;
                 }
                 if info.line_reviews.percent_ignored() == 100 {
                     return false;
@@ -525,21 +522,14 @@ fn Home(cx: Scope) -> impl IntoView {
                 if filters().only_with_comments && info.comments.is_empty() {
                     return false;
                 }
-                if filters().only_c_files && filters().only_go_files {
-                    if !(file_name.ends_with(".c")
-                        || file_name.ends_with(".cpp")
-                        || file_name.ends_with(".h")
-                        || file_name.ends_with(".go"))
-                    {
-                        return false;
-                    }
-                } else if filters().only_c_files
+                if filters().only_go_files & !file_name.ends_with("go") {
+                    return false;
+                }
+                if filters().only_c_files
                     && !(file_name.ends_with(".c")
                         || file_name.ends_with(".cpp")
                         || file_name.ends_with(".h"))
                 {
-                    return false;
-                } else if filters().only_go_files && !file_name.ends_with(".go") {
                     return false;
                 }
                 true
